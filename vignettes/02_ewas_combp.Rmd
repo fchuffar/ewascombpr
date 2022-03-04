@@ -1,0 +1,468 @@
+---
+title: "Methylome analysis"
+subtitle: "Method 2: EWAS + comb-p"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
+```
+
+
+```{r params}
+# # source("common.R") ; study_filename="study_smoke3p_meth_raw.rds";pheno_key="model09"; confounder="time" ; model_func_name="model_call_smoke3p"      ;pval_thresh = 1e-4; source(knitr::purl("04_ewas_combp.Rmd")); model_formula= "meth~jactrlcsc+time", rmarkdown::render("04_ewas_combp.Rmd", output_file=paste0("04_ewas_combp_", pheno_key, "_", study_filename, ".html"))
+#
+source("../R/common.R")
+
+# source("modelcall.R")
+
+if (!exists("study_filename"))  study_filename = "study_GSE40279.rds"   ;
+if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
+if (!exists("model_func_name")) model_func_name = "modelcalllm"         ;
+if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
+```
+
+
+
+```{r prefix}
+prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
+prefix2 = paste0(prefix, "_", pval_thresh)
+```
+
+# Data
+
+targetted study is: `r study_filename`
+
+```{r data, results="verbatim"}
+s = mreadRDS(study_filename)
+d = s$data
+e = s$exp_grp
+pf = s$platform
+
+pf_orig = pf
+pf_chr_colname = colnames(pf_orig)[1]
+pf_pos_colname = colnames(pf_orig)[2]
+
+print("# dim meth matrix:")
+dim(d)
+
+# head(e[,rev(colnames(e))[1:12]])
+head(e)
+dim(e)
+
+for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
+  if (is.character(e[[f]])) {
+    print(paste0("Converting ", f, " as factor."))
+    e[[f]] = as.factor(e[[f]])
+  }
+}
+
+
+for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
+  if (is.factor(e[[f]])) {
+    table(e[[f]], useNA="ifany")    
+  } else if (is.numeric(e[[f]])) {
+    plot(density(e[[f]]))
+  } else {
+    stop(paste0("Covariate ", f, " is not factor nor numeric."))
+  }
+}
+```
+
+# Model 
+
+`r model_formula`
+
+
+
+# EWAS
+
+```{r ewas}
+USE_PARAPPLY = TRUE
+if (length(rownames(attr(stats::terms(as.formula(model_formula)), "factor"))) < 3) {
+  nb_fact_of_interest = 1
+} else if (rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1][2] == "hb") {
+  nb_fact_of_interest = 2
+} else {
+  nb_fact_of_interest = 1  
+}
+ewas_orig = ewas = mewas_func2(d=d, e=e, USE_PARAPPLY=USE_PARAPPLY, model_formula=model_formula, model_func_name=model_func_name, nb_fact_of_interest=nb_fact_of_interest)
+
+if (FALSE) {
+  # source("~/projects/expedition_5300/results/meth/common.R") ; build_feats_epic_grch38(pf_orig=pf, pf_chr_colname="seqnames", pf_pos_colname="start")
+  feats_epic_grch38 = mbuild_feats_epic_grch38(pf_orig=pf, pf_chr_colname="chr", pf_pos_colname="pos")
+  # feats_epic_grch38 = feats_epic_grch38[sapply(feats_epic_grch38, length) > 1]
+  # idx_probes = unique(unlist(feats_epic_grch38))
+  # idx_probes = intersect(idx_probes, rownames(d))
+  # length(feats_epic_grch38)
+  # length(idx_probes)
+  # USE_PARAPPLY = FALSE
+  # idx_probes = idx_probes[74188:74500]
+
+  feats_epic_grch38 = feats_epic_grch38[sapply(feats_epic_grch38, length) > 1]
+  idx_probes = unique(unlist(feats_epic_grch38))
+  idx_probes = intersect(idx_probes, rownames(ewas))
+} else {
+  idx_probes = rownames(ewas)
+}
+
+ewas = ewas[idx_probes,]
+
+ewas = ewas[!is.na(ewas[,"lpv"]),]
+
+# tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
+# ewas = mewas_func(d=d[tmp_probes,], e, USE_PARAPPLY, pheno_key=pheno_key)
+```
+
+
+
+
+
+
+
+
+```{r plot_ewas}
+layout(matrix(1:2, 1), respect=TRUE,)
+plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
+range(ewas[,"lpv"])
+range(ewas[,"beta"])
+
+
+plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
+
+
+```
+
+# Comb-p
+
+```{r build_bed}
+head(ewas)
+head(pf[,1:6])
+lpval = ewas[,"lpv"]
+# plot(lpval, main="Manhattan plot")
+
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(density(lpval), main="original pval")
+# if (max(lpval)>40) {
+#   lpval = 40*lpval/max(lpval)
+# }
+lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
+# lpval[lpval > 40] = 40
+plot(density(lpval), main="corrected pval")
+
+pval = 10^-lpval
+
+# build and write bed file
+bed = pf[rownames(ewas),1:2] # Warning, here pf is global, it must be arg and indexed!!
+head(bed)
+bed[,3] = bed[,2]+1
+bed$probes = names(pval)
+bed$pval = pval
+bed$strand = "+"
+colnames(bed) = c("chrom", "start", "end", "probes", "pval", "strand")
+head(bed)
+
+# write ewas res for combp
+bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
+bed[,1] = as.character(bed[,1])
+bed = bed[order(bed[,1], bed[,2]),]
+write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
+# bed = read.table(ewas_filename, sep="\t", header=TRUE)
+```
+
+```{r combp}
+# Run comb-p, run!!
+cmd = "comb-p"
+arg = paste0("pipeline -c 5 --seed ", pval_thresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
+print(paste(cmd, arg))
+system2(cmd, arg)
+```
+
+```{r echo=FALSE, out.width="100%", results="asis"}
+manhattan_file = paste0("dmr_", prefix2, ".manhattan.png")
+if (file.exists(manhattan_file)) {
+  cat(paste0("![](", manhattan_file, ")"), "\n")
+}
+```
+
+
+```{r combp_outputs}
+# recuparation du fichier dmrbycombp1000_SGCE.fdr.bed après comb-p
+ewas = read.table(paste0("ewas4combp_", prefix, ".bed"), header=TRUE)
+combp_res_probes = read.table(gzfile(paste0("dmr_", prefix2, ".fdr.bed.gz")), comment="@", header=TRUE)
+combp_res_region_filename = paste0("dmr_", prefix2, ".regions-t.bed")
+if (file.exists(combp_res_region_filename)) {  
+  combp_res_region = read.table(combp_res_region_filename, comment="@", header=TRUE)
+  # head(combp_res_region[order(-combp_res_region$n_probes, combp_res_region$z_sidak_p),])
+  # reg = combp_res_region[order(-combp_res_region$n_probes, combp_res_region$z_sidak_p),][1,]
+  # probes = ewas[as.character(ewas[,1])==as.character(reg[[1]]) & ewas[,2]>=reg[[2]] & ewas[,2]<=reg[[3]],4]
+} else {
+  combp_res_region = data.frame(n_probes=NA, z_sidak_p=NA)[-1,]
+  combp_res_region
+}
+results = combp_res_region
+results_filename = paste0("tmp_", prefix2, ".bed")
+```
+
+
+
+
+```{r, eval=nrow(results)>0}
+print("# # annotate dmr")
+rownames(results) = paste0(results[,1], ":", results[,2], "-", results[,3])
+results = cbind(results[,1:3], id=rownames(results), len=results[,3] - results[,2], strand="+", results[,4:ncol(results)])
+head(results)
+```
+
+
+```{r dmr_indexed_probes, eval=nrow(results)>0}
+print("# # dmr_indexed_probes")
+# meth pf
+# pf_chr_colname = "seqnames"
+# pf_pos_colname = "start"
+# pf_orig = mreadRDS("~/projects/datashare/platforms/EPIC.hg38.manifest.full.fch.rds")
+pf_orig = pf_orig[pf_orig[,pf_pos_colname]>0,]    
+pf_orig = pf_orig[order(pf_orig[[pf_chr_colname]],pf_orig[[pf_pos_colname]]), ]
+## index meth probes by chr
+chrs = unique(pf_orig[[pf_chr_colname]])
+chrs_indexed_methpf = lapply(chrs, function(chr) {
+  # print(chr)
+  idx = rownames(pf_orig)[!is.na(pf_orig[[pf_chr_colname]]) & pf_orig[[pf_chr_colname]]==chr]  
+  ret = pf_orig[idx,]
+  return(ret)
+})
+names(chrs_indexed_methpf) = chrs
+
+dmr_indexed_probes = epimedtools::monitored_apply(results, 1, function(feat) {
+  # feat = fat_feat[3,]
+  # print(feat)
+  chr = feat[[1]]
+  len = as.numeric(feat[[5]])
+  meth_platform = chrs_indexed_methpf[[chr]]
+  ret = dmprocr::get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len) 
+  # meth_platform[ret,1:3]
+  # feat
+  return(ret)
+})
+```
+
+
+```{r effect_by_dmr_from_ewas, eval=nrow(results)>0}
+results$ewas_pv     = NA
+results$ewas_effect = NA
+for (ff_id in rownames(results)) {
+  if (nrow(results)>1 & !is.matrix(dmr_indexed_probes)) {
+    p = intersect(dmr_indexed_probes[[ff_id]], rownames(ewas_orig))
+  } else {
+    p = intersect(dmr_indexed_probes[,ff_id], rownames(ewas_orig))    
+  }
+  results[ff_id, ]$ewas_pv     = signif(10^-mean(ewas_orig[p,2], na.rm=TRUE), 3)
+  results[ff_id, ]$ewas_effect = signif(mean(ewas_orig[p,1], na.rm=TRUE), 3)    
+}
+head(results)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r annotate dmr, eval=nrow(results)>0}
+# annotatr
+print(results_filename)
+write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
+dm_regions = annotatr::read_regions(con=results_filename, genome = 'hg38', format = 'bed')
+# Build the annotations (a single GRanges object)
+if (! exists("annotations")) {
+  annots = c("hg38_lncrna_gencode")
+  annots = c('hg38_cpgs', 'hg38_basicgenes', "hg38_lncrna_gencode", "hg38_enhancers_fantom")
+  annots = c('hg38_cpgs', 'hg38_basicgenes', "hg38_enhancers_fantom")
+  annots = c('hg38_cpgs', 'hg38_basicgenes')
+  annots = c('hg38_basicgenes')
+  annotations = annotatr::build_annotations(genome = 'hg38', annotations = annots)  
+}
+# Intersect the regions we read in with the annotations
+dm_annotated = annotatr::annotate_regions(
+    regions = dm_regions,
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+# A GRanges object is returned
+df_dm_annotated = data.frame(dm_annotated)
+# dedup
+df_dm_annotated$annot.type = factor(df_dm_annotated$annot.type, levels=c("hg38_genes_promoters", "hg38_genes_1to5kb", "hg38_genes_5UTRs", "hg38_genes_exons", "hg38_genes_introns", "hg38_genes_3UTRs"))
+table(df_dm_annotated$annot.type)
+table(df_dm_annotated$name)
+df_dm_annotated = df_dm_annotated[order(df_dm_annotated$name, df_dm_annotated$annot.type),]
+df_dm_annotated = df_dm_annotated[!duplicated(paste(df_dm_annotated$name, df_dm_annotated$annot.symbol)),]
+dim(df_dm_annotated)
+table(df_dm_annotated$annot.type)
+# aggregat by fat_feat
+fat_feat_annotations = lapply(unique(df_dm_annotated$name), function(n) {
+  # n = "chr7:2661785-2662169"
+  foo = df_dm_annotated[df_dm_annotated$name==n,]
+  if (sum(df_dm_annotated$name==n) == 1) {
+    return(foo)
+  } else {
+    foo[["annot.symbol"]] = paste0(foo[["annot.symbol"]],collapse=";")
+    foo[["annot.type"]] = paste0(foo[["annot.type"]],collapse=";")
+    foo[["annot.tx_id"]] = paste0(foo[["annot.tx_id"]],collapse=";")
+    return(foo[1,])
+  }
+})
+fat_feat_annotations = do.call(rbind, fat_feat_annotations)
+rownames(fat_feat_annotations) = fat_feat_annotations$name
+head(fat_feat_annotations)
+rownames(fat_feat_annotations) %in% rownames(results)
+rownames(results) %in% rownames(fat_feat_annotations)
+# inject into results
+results$annot.type   = NA
+results$annot.symbol = NA
+results$annot.tx_id  = NA
+for (idx in rownames(fat_feat_annotations)) {
+  results[idx,"annot.type"  ] = as.character(fat_feat_annotations[idx,"annot.type"  ])
+  results[idx,"annot.symbol"] = as.character(fat_feat_annotations[idx,"annot.symbol"])
+  results[idx,"annot.tx_id" ] = as.character(fat_feat_annotations[idx,"annot.tx_id" ])  
+}
+
+results$nb_probes = NA
+results$probes = NA
+
+
+for (idx in rownames(results)) {
+  if (nrow(results)>1 & !is.matrix(dmr_indexed_probes)) {
+    idx_probes = dmr_indexed_probes[[idx]]
+  } else {
+    idx_probes = dmr_indexed_probes[,idx]
+  }
+  results[idx, "nb_probes"] = length(idx_probes)
+  results[idx, "probes"] = paste(idx_probes, collapse=";")
+}
+
+tmpidx = order(results[,"z_sidak_p"])
+results = results[tmpidx,]
+
+# results$url = sapply(results[,4], function(i){
+#   output_pdf_filename = paste0("global_results/", prefix2, "_", i, ".pdf")
+#   paste0("http://epimed.univ-grenoble-alpes.fr/downloads/florent/expedition_5300/results/meth/", output_pdf_filename)
+# })
+
+results_filename = paste0("global_results_", prefix2, ".xlsx")
+print(results_filename)
+WriteXLS::WriteXLS(results, results_filename, FreezeCol=6, FreezeRow=1, BoldHeaderRow=TRUE, AdjWidth=TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Results
+
+`r study_filename`
+
+$$\text{`r model_formula`}$$
+
+There are `r nrow(results)` regions of interest with `pval_thresh`=$`r pval_thresh`$.
+
+[`r results_filename`](`r results_filename`)
+
+```{r results="verbatim", eval=nrow(results)>0}
+tmp_results = results
+rownames(tmp_results) = NULL
+nb_max_res = 12
+print(tmp_results[1:min(nb_max_res, nrow(tmp_results)),])
+```
+
+
+```{r, eval=nrow(results)>0}
+if (nrow(results) > 0) {
+  for (i in rownames(results)[1:min(nb_max_res, nrow(results))]) {
+    print(i)
+    roi = results[i,]
+    if (nrow(results)>1 & !is.matrix(dmr_indexed_probes)) {
+      idx_probes = dmr_indexed_probes[[i]]
+    } else {
+      idx_probes = dmr_indexed_probes[,i]
+    }
+    plot_res(
+      roi, 
+      combp_res_probes=combp_res_probes, 
+      ewas=ewas, 
+      pheno_key=rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2],
+      idx_probes=idx_probes,
+      study_filename=study_filename
+    )
+  } 
+}
+```
+
+```{r results_pdf, eval=FALSE}
+dir.create(path="global_results", showWarnings=FALSE, recursive=TRUE)
+if (nrow(results) > 0) {
+  for (i in rownames(results)) {
+    output_pdf_filename = paste0("global_results/", prefix2, "_", i, ".pdf")
+    print(paste0("http://epimed.univ-grenoble-alpes.fr/downloads/florent/expedition_5300/results/meth/", output_pdf_filename))
+    pdf(output_pdf_filename, width=12, height=6)
+    print(i)
+    roi = results[i,]
+    if (nrow(results)>1 & !is.matrix(dmr_indexed_probes)) {
+      idx_probes = dmr_indexed_probes[[i]]
+    } else {
+      idx_probes = dmr_indexed_probes[,i]
+    }
+    plot_res(roi, combp_res_probes=combp_res_probes, ewas=ewas,
+      pheno_key=rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2],
+      idx_probes=idx_probes,
+      study_filename=study_filename
+    )
+    dev.off()
+  } 
+}
+```
+
+
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
+
+
+

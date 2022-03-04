@@ -1,0 +1,117 @@
+---
+title: "Build methylation study"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
+if (!exists("gse")) {gse = "GSE40279"}
+```
+
+```{r batch, eval=FALSE}
+for (gse in c( 
+  "GSE41037", 
+  "GSE41169",
+  "GSE40279",
+  "GSE20067",
+  "GSE20236",
+  "GSE19711",
+  "GSE19711",
+  "GSE42861",
+  "GSE111223",
+  "GSE34035",
+  "GSE28746", 
+  "GSE34035",
+  # "GSE120610",
+  "GSE159899",
+  "GSE145254"
+  "GSE179759"
+)) {
+  print(paste0("************ ", gse, " ************"))
+  s_filename = paste0("study_", gse, ".rds")
+  if (!file.exists(s_filename)) 
+  {
+    rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".Rmd"))    
+  }
+}
+```
+
+
+# Purpose
+
+This vignette 
+
+- build
+- check
+- save 
+
+methylation study for `r gse`.
+
+```{r build, echo=FALSE, eval=TRUE}
+# Build
+s_filename = paste0("study_", gse, ".rds")
+print(paste0("#####", gse))
+s_tmp = epimedtools::create_study()
+s_tmp$gse = gse
+foo = s_tmp$get_data(dest_dir="~/projects/datashare")
+dim(foo)
+s = epimedtools::create_study()
+# data
+s$data = foo
+# exp_grp from epimed_DB
+url = paste0("http://epimed.univ-grenoble-alpes.fr/database/parameters/",gse)
+df1 = read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE, dec=".", na.strings="", row.names=1)
+s$exp_grp = df1
+if (s_tmp$platform_name=="GPL8490") {
+  print("27k")
+  library(IlluminaHumanMethylation27kanno.ilmn12.hg19)
+  pf27k = data.frame(getAnnotation(IlluminaHumanMethylation27kanno.ilmn12.hg19))
+  s$platform = pf27k
+} else if (s_tmp$platform_name=="GPL13534") {
+  print("450k")
+  library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+  pf450k = data.frame(getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19))
+  s$platform = pf450k  
+} else if (s_tmp$platform_name=="GPL23976") {
+  print("epic")
+  library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)  
+  pfepic = data.frame(getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19))
+  s$platform = pfepic  
+} else {
+  stop(paste0("platform problem ", gse))
+}
+
+# Check
+dim(s$data)
+dim(s$exp_grp)
+if (sum(!rownames(s$exp_grp) %in% colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
+s$exp_grp = s$exp_grp[colnames(s$data),]
+if (sum(rownames(s$exp_grp) != colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
+
+dim(s$platform)
+dim(s$data)
+if (sum(!rownames(s$data) %in% rownames(s$platform)) !=0 ) {warning(paste0("problem pf names ", gse))}
+s$platform = s$platform[intersect(rownames(s$data), rownames(s$platform)),]
+s$data = s$data[rownames(s$platform),]
+if (sum(rownames(s$data) != rownames(s$platform)) !=0 ) {stop(paste0("problem pf names ", gse))}
+
+# Save
+s$save(s_filename)
+df = cbind(s$exp_grp, t(s$data[,rownames(s$exp_grp)]))
+saveRDS(df, paste0("df_", gse, ".rds"))
+```
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
