@@ -115,17 +115,35 @@ plot_res = function(
   pheno_key2,
   LAYOUT=TRUE
 ) {
+
   if (!missing(study_filename)) {
     s = mreadRDS(study_filename)
   }
   d = s$data
   e = s$exp_grp
 
+  factors = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))
+
+  for (f in factors[-1]) {
+    if (is.character(e[[f]])) {
+      print(paste0("Converting ", f, " as factor."))
+      e[[f]] = as.factor(e[[f]])
+    }
+  }
+
   if (missing(pheno_key2)) {
     pheno_key2 = "hb"
   }
   if (!pheno_key2 %in% colnames(e)) {
-    pheno_key2 = pheno_key
+    if (length(factors)>=3) {
+      if (is.factor(e[[factors[3]]])) {
+        pheno_key2 = factors[3]
+      } else {
+        pheno_key2 = pheno_key      
+      }
+    } else {
+      pheno_key2 = pheno_key      
+    }
   }
 
   if (missing(idx_probes)) {
@@ -139,12 +157,12 @@ plot_res = function(
 
   idx_probes = intersect(idx_probes, rownames(d))
   d = d[idx_probes,]
-  if ("tissue" %in% colnames(e)) {
-    idx_sample = rownames(e)[order(e[["tissue"]], e[[pheno_key]], e[[pheno_key2]])]
-  } else if ("hb" %in% colnames(e)) {
-    idx_sample = rownames(e)[order(e[[pheno_key]], e[["hb"]])]
+  if ("tissue" %in% factors) {
+    idx_sample = rownames(e)[order(e[["tissue"]], e[[pheno_key2]], e[[pheno_key]])]
+  } else if (is.factor(e[[pheno_key2]])) {
+    idx_sample = rownames(e)[order(e[[pheno_key2]], e[[pheno_key]])]
   } else {
-    idx_sample = rownames(e)[order(e[[pheno_key]])]
+    idx_sample = rownames(e)[order(e[[pheno_key]], e[[pheno_key2]])]
   }
 
   if (length(idx_probes) > 1) {
@@ -158,6 +176,7 @@ plot_res = function(
         ), 4, byrow=TRUE), respect=TRUE)
     }
 
+
     # PHENO
     par(mar=c(5.7, 4.1, 4.1, 0))
     if (is.factor(e[,pheno_key])) {
@@ -166,12 +185,16 @@ plot_res = function(
       col=1
     }
     plot(
-      e[idx_sample,pheno_key2], 1:length(idx_sample),
-      xlab=rename_results(pheno_key2), ylab=rename_results(pheno_key),
+      e[idx_sample,pheno_key], 1:length(idx_sample),
+      xlab=rename_results(pheno_key), ylab=rename_results(pheno_key2),
       yaxt="n", yaxs = "i", main="",
       col=col,
       pch=16
     )
+    if (is.factor(e[[pheno_key2]])) {
+      abline(h=cumsum(table(e[[pheno_key2]])), lty=2, col="grey")
+      axis(2, at=cumsum(table(e[[pheno_key2]])) - (table(e[[pheno_key2]])/2), levels(e[[pheno_key2]]))
+    }
     # axis(1, at=c(min(e[idx_sample,pheno_key2]), max(e[idx_sample,pheno_key2])), signif(c(min(e[idx_sample,pheno_key2], na=rm=TRUE), max(e[idx_sample,pheno_key2])), 3))
 
     # METH
@@ -213,6 +236,8 @@ plot_res = function(
     # m$coefficients
     # main = paste0(levels(df$pheno)[2], " effect = " ,   signif(m$coefficients[[2]],3))
     main = ""
+    
+    
 
     # BOXPLOT
     par(mar=c(5.1, 4.1, 4.1, 2.1))
