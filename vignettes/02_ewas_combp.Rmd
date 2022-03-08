@@ -26,8 +26,8 @@ source("../R/common.R")
 # source("modelcall.R")
 
 if (!exists("study_filename"))  study_filename = "study_GSE40279.rds"   ;
-if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
 if (!exists("model_func_name")) model_func_name = "modelcalllm"         ;
+if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
 if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
 ```
 
@@ -292,15 +292,15 @@ head(results)
 # annotatr
 print(results_filename)
 write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
-dm_regions = annotatr::read_regions(con=results_filename, genome = 'hg38', format = 'bed')
+dm_regions = annotatr::read_regions(con=results_filename, genome = 'hg19', format = 'bed')
 # Build the annotations (a single GRanges object)
 if (! exists("annotations")) {
-  annots = c("hg38_lncrna_gencode")
-  annots = c('hg38_cpgs', 'hg38_basicgenes', "hg38_lncrna_gencode", "hg38_enhancers_fantom")
-  annots = c('hg38_cpgs', 'hg38_basicgenes', "hg38_enhancers_fantom")
-  annots = c('hg38_cpgs', 'hg38_basicgenes')
-  annots = c('hg38_basicgenes')
-  annotations = annotatr::build_annotations(genome = 'hg38', annotations = annots)  
+  annots = c("hg19_lncrna_gencode")
+  annots = c('hg19_cpgs', 'hg19_basicgenes', "hg19_lncrna_gencode", "hg19_enhancers_fantom")
+  annots = c('hg19_cpgs', 'hg19_basicgenes', "hg19_enhancers_fantom")
+  annots = c('hg19_cpgs', 'hg19_basicgenes')
+  annots = c('hg19_basicgenes')
+  annotations = annotatr::build_annotations(genome = 'hg19', annotations = annots)  
 }
 # Intersect the regions we read in with the annotations
 dm_annotated = annotatr::annotate_regions(
@@ -311,7 +311,7 @@ dm_annotated = annotatr::annotate_regions(
 # A GRanges object is returned
 df_dm_annotated = data.frame(dm_annotated)
 # dedup
-df_dm_annotated$annot.type = factor(df_dm_annotated$annot.type, levels=c("hg38_genes_promoters", "hg38_genes_1to5kb", "hg38_genes_5UTRs", "hg38_genes_exons", "hg38_genes_introns", "hg38_genes_3UTRs"))
+df_dm_annotated$annot.type = factor(df_dm_annotated$annot.type, levels=c("hg19_genes_promoters", "hg19_genes_1to5kb", "hg19_genes_5UTRs", "hg19_genes_exons", "hg19_genes_introns", "hg19_genes_3UTRs"))
 table(df_dm_annotated$annot.type)
 table(df_dm_annotated$name)
 df_dm_annotated = df_dm_annotated[order(df_dm_annotated$name, df_dm_annotated$annot.type),]
