@@ -30,6 +30,10 @@ if (!exists("study_filename"))  study_filename = "study_GSE40279.rds"   ;
 if (!exists("model_func_name")) model_func_name = "modelcalllm"         ;
 if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
 if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
+
+if (file.exists(paste0(model_func_name, ".R"))) {
+  source(paste0(model_func_name, ".R"))
+}
 ```
 
 
@@ -57,7 +61,7 @@ pf_pos_colname = colnames(pf_orig)[2]
 print("# dim meth matrix:")
 dim(d)
 
-# head(e[,rev(colnames(e))[1:12]])
+print("# experimental grouping:")
 head(e)
 dim(e)
 
@@ -69,11 +73,12 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 }
 
 
+layout(matrix(1:6,2), respect=TRUE)
 for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
   if (is.factor(e[[f]])) {
     table(e[[f]], useNA="ifany")    
   } else if (is.numeric(e[[f]])) {
-    plot(density(e[[f]]))
+    plot(density(e[[f]], na.rm=TRUE), main=f)
   } else {
     stop(paste0("Covariate ", f, " is not factor nor numeric."))
   }
@@ -135,33 +140,21 @@ ewas = ewas[!is.na(ewas[,"lpv"]),]
 ```{r plot_ewas}
 layout(matrix(1:2, 1), respect=TRUE,)
 plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
-range(ewas[,"lpv"])
-range(ewas[,"beta"])
-
-
-plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
-
-
 ```
-
-# Comb-p
 
 ```{r build_bed}
 head(ewas)
 head(pf[,1:6])
 lpval = ewas[,"lpv"]
-# plot(lpval, main="Manhattan plot")
 
-
-
-layout(matrix(1:2, 1), respect=TRUE)
-plot(density(lpval), main="original pval")
-# if (max(lpval)>40) {
-#   lpval = 40*lpval/max(lpval)
-# }
-lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
-# lpval[lpval > 40] = 40
-plot(density(lpval), main="corrected pval")
+# layout(matrix(1:2, 1), respect=TRUE)
+# plot(density(lpval), main="original pval")
+# # if (max(lpval)>40) {
+# #   lpval = 40*lpval/max(lpval)
+# # }
+# lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
+# # lpval[lpval > 40] = 40
+# plot(density(lpval), main="corrected pval")
 
 pval = 10^-lpval
 
@@ -182,6 +175,13 @@ bed = bed[order(bed[,1], bed[,2]),]
 write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
 # bed = read.table(ewas_filename, sep="\t", header=TRUE)
 ```
+
+EWAS results is exporetd as: 
+[`r bed_ewas_filename`](./`r bed_ewas_filename`)
+
+
+# Comb-p
+
 
 ```{r combp}
 # Run comb-p, run!!
@@ -401,7 +401,7 @@ $$\text{`r model_formula`}$$
 
 There are `r nrow(results)` regions of interest with `pval_thresh`=$`r pval_thresh`$.
 
-[`r results_filename`](`r results_filename`)
+[`r results_filename`](./`r results_filename`)
 
 ```{r results="verbatim", eval=nrow(results)>0}
 tmp_results = results
