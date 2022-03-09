@@ -22,6 +22,7 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 # # source("common.R") ; study_filename="study_smoke3p_meth_raw.rds";pheno_key="model09"; confounder="time" ; model_func_name="model_call_smoke3p"      ;pval_thresh = 1e-4; source(knitr::purl("04_ewas_combp.Rmd")); model_formula= "meth~jactrlcsc+time", rmarkdown::render("04_ewas_combp.Rmd", output_file=paste0("04_ewas_combp_", pheno_key, "_", study_filename, ".html"))
 #
 source("../R/common.R")
+source("config")
 
 # source("modelcall.R")
 
@@ -43,6 +44,7 @@ prefix2 = paste0(prefix, "_", pval_thresh)
 targetted study is: `r study_filename`
 
 ```{r data, results="verbatim"}
+print(paste0("Loading ", study_filename, "..."))
 s = mreadRDS(study_filename)
 d = s$data
 e = s$exp_grp
@@ -292,15 +294,15 @@ head(results)
 # annotatr
 print(results_filename)
 write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
-dm_regions = annotatr::read_regions(con=results_filename, genome = 'hg19', format = 'bed')
+dm_regions = annotatr::read_regions(con=results_filename, genome=genome, format="bed")
 # Build the annotations (a single GRanges object)
 if (! exists("annotations")) {
-  annots = c("hg19_lncrna_gencode")
-  annots = c('hg19_cpgs', 'hg19_basicgenes', "hg19_lncrna_gencode", "hg19_enhancers_fantom")
-  annots = c('hg19_cpgs', 'hg19_basicgenes', "hg19_enhancers_fantom")
-  annots = c('hg19_cpgs', 'hg19_basicgenes')
-  annots = c('hg19_basicgenes')
-  annotations = annotatr::build_annotations(genome = 'hg19', annotations = annots)  
+  # annots = paste0(genome, c("_lncrna_gencode"))
+  # annots = paste0(genome, c('_cpgs', '_basicgenes', "_lncrna_gencode", "_enhancers_fantom"))
+  # annots = paste0(genome, c('_cpgs', '_basicgenes', "_enhancers_fantom"))
+  # annots = paste0(genome, c('_cpgs', '_basicgenes'))
+  annots = paste0(genome, c("_basicgenes"))
+  annotations = annotatr::build_annotations(genome=genome, annotations=annots)  
 }
 # Intersect the regions we read in with the annotations
 dm_annotated = annotatr::annotate_regions(
@@ -311,7 +313,7 @@ dm_annotated = annotatr::annotate_regions(
 # A GRanges object is returned
 df_dm_annotated = data.frame(dm_annotated)
 # dedup
-df_dm_annotated$annot.type = factor(df_dm_annotated$annot.type, levels=c("hg19_genes_promoters", "hg19_genes_1to5kb", "hg19_genes_5UTRs", "hg19_genes_exons", "hg19_genes_introns", "hg19_genes_3UTRs"))
+df_dm_annotated$annot.type = factor(df_dm_annotated$annot.type, levels=paste0(genome, c("_genes_promoters", "_genes_1to5kb", "_genes_5UTRs", "_genes_exons", "_genes_introns", "_genes_3UTRs")))
 table(df_dm_annotated$annot.type)
 table(df_dm_annotated$name)
 df_dm_annotated = df_dm_annotated[order(df_dm_annotated$name, df_dm_annotated$annot.type),]
