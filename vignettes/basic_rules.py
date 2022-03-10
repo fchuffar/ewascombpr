@@ -25,7 +25,7 @@ rule build_study_geo:
 export PATH="/summer/epistorage/opt/bin:$PATH"
 export PATH="/summer/epistorage/miniconda3/bin:$PATH"
 cd {wildcards.prefix}
-echo "gse = GSE'{wildcards.gse}'; rmarkdown::render('{input.rmd_script}', output_file=paste0('01_build_study_GSE', gse ,'.html'))" | Rscript -
+echo "gse = 'GSE{wildcards.gse}'; rmarkdown::render('{input.rmd_script}', output_file=paste0('01_build_study_GSE', gse ,'.html'))" | Rscript -
 """
 
 

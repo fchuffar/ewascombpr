@@ -1,3 +1,4 @@
+project="smoke3p"
 species="Homo_sapiens"  
 genome="hg19"
 annotation="UCSC"
