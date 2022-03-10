@@ -1,6 +1,27 @@
 # ewascombpr
 A line that pipes epimedtools DNA methylation study to an ewas then to combp.
 
+# Quick launch
+
+## Under your terminal
+
+```
+cd ~/projects
+git clone https://github.com/fchuffar/ewascombpr.git
+cd ewascombpr/vignettes
+R 
+```
+
+## Under R
+
+```
+# build Hannum 2013 study
+rmarkdown::render("vignettes/01_build_study_geo.Rmd")
+# run pipeline
+rmarkdown::render("vignettes/02_ewas_combp.Rmd")
+```
+
+
 
 # Usage
   
