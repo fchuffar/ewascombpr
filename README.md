@@ -1,6 +1,14 @@
 # ewascombpr
 A line that pipes epimedtools DNA methylation study to an ewas then to combp.
 
+
+# Prerequisits
+
+Following packages are required:
+```
+IlluminaHumanMethylation450kanno.ilmn12.hg19'
+``` 
+ 
 # Quick launch
 
 ## Under your terminal
