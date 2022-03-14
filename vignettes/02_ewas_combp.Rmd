@@ -114,7 +114,6 @@ ewas = ewas[!is.na(ewas[,"lpv"]),]
 dim(ewas)
 
 
-FILTER_EWAS_FOR_DMR_CANDIDATE = TRUE
 if (FILTER_EWAS_FOR_DMR_CANDIDATE) {
   # source("~/projects/expedition_5300/results/meth/common.R") ; build_dmr_candidates(pf_orig=pf, pf_chr_colname="seqnames", pf_pos_colname="start")
   dmr_candidates = mbuild_dmr_candidates(pf=pf, pf_chr_colname="chr", pf_pos_colname="pos")
