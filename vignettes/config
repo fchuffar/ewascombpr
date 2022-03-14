@@ -1,4 +1,5 @@
 project="smoke3p"
+study="ewascombpr"
 species="Homo_sapiens"  
 genome="hg19"
 annotation="UCSC"

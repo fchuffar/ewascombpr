@@ -1,6 +1,6 @@
-cd ~/projects/smoke3p/results/ewascombpr/vignettes
+cd ~/projects/expedition_5300/results/GSE162606/vignettes
 source config
-rsync -auvP ~/projects/${project}/results/ewascombpr/ cargo:~/projects/${project}/results/ewascombpr/
+rsync -auvP ~/projects/${project}/results/${study}/ cargo:~/projects/${project}/results/${study}/
   
 # launch default pipeline
 snakemake -s wf.py -pn
