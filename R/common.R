@@ -23,7 +23,9 @@ ewas_func2 = function(d, e, USE_PARAPPLY, model_formula, nb_fact_of_interest=1, 
     ewas = parallel::parApply(cl, d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
   } else {
     print("ewas using epimedtools::monitored_apply")
-    ewas = epimedtools::monitored_apply(d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
+    # apply_func = epimedtools::monitored_apply
+    apply_func = apply
+    ewas = apply_func(d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
   }
   print("done")
   ewas = t(ewas)
@@ -338,6 +340,64 @@ plot_res = function(
   }
   par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
 }
+
+
+
+build_dmr_candidates = function(pf, pf_chr_colname=1, pf_pos_colname=2, extend_region_dist=1000) {
+  pf = pf[pf[,pf_pos_colname]>0,]
+  pf = pf[order(pf[[pf_chr_colname]],pf[[pf_pos_colname]]), ]
+  ## index meth probes by chr
+  chrs = unique(pf[[pf_chr_colname]])
+  chrs_indexed_methpf = lapply(chrs, function(chr) {
+    print(chr)
+    idx = rownames(pf)[!is.na(pf[[pf_chr_colname]]) & pf[[pf_chr_colname]]==chr]
+    ret = pf[idx,]
+    return(ret)
+  })
+  names(chrs_indexed_methpf) = chrs
+
+  fat_feat = lapply(unique(pf[,pf_chr_colname]), function(chr) {
+    d = pf[pf[,pf_chr_colname]==chr,c(pf_chr_colname, pf_pos_colname)]
+    i = intervals::Intervals(c(d[,2], d[,2]+1), type="Z")
+    # enlarge your fat feat
+    l = extend_region_dist
+    c = intervals::close_intervals( intervals::contract( intervals::reduce(intervals::expand(i, l)), l) )
+    dim(c)
+    df = data.frame(chr, c[,1], c[,2])
+    return(df)
+  })
+  fat_feat = do.call(rbind, fat_feat)
+  dim(fat_feat)
+  fat_feat[,4] = paste0(fat_feat[,1], ":", fat_feat[,2], "-", fat_feat[,3])
+  fat_feat[,5] = fat_feat[,3] - fat_feat[,2]
+  fat_feat[,6] = "+"
+  fat_feat = fat_feat[fat_feat[,5]>1,]
+  rownames(fat_feat) = fat_feat[,4]
+  colnames(fat_feat)  = c("chr", "start", "end", "id", "score", "strand")
+  dim(fat_feat)
+  head(fat_feat)
+
+  ## index probes by feat name
+  print("# indexing probes by feat name")
+  feat_indexed_probes = epimedtools::monitored_apply(fat_feat, 1, function(feat) {
+    # feat = fat_feat[3,]
+    # print(feat)
+    chr = feat[[1]]
+    len = as.numeric(feat[[5]])
+    meth_platform = chrs_indexed_methpf[[chr]]
+    ret = dmprocr::get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
+    # meth_platform[ret,1:3]
+    # feat
+    return(ret)
+  })
+
+  nb_probes = sapply(feat_indexed_probes, length)
+  fat_feat$score = nb_probes[rownames(fat_feat)]
+  return(feat_indexed_probes)
+}
+
+if (!exists("mbuild_dmr_candidates")) {mbuild_dmr_candidates = memoise::memoise(build_dmr_candidates)}
+
 
 
 
