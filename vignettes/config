@@ -1,5 +1,6 @@
-project="smoke3p"
-study="ewascombpr"
+project="expedition_5300"
+study="GSE162606"
 species="Homo_sapiens"  
 genome="hg19"
 annotation="UCSC"
+FILTER_EWAS_FOR_DMR_CANDIDATE=TRUE
