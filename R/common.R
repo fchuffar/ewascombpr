@@ -23,9 +23,7 @@ ewas_func2 = function(d, e, USE_PARAPPLY, model_formula, nb_fact_of_interest=1, 
     ewas = parallel::parApply(cl, d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
   } else {
     print("ewas using epimedtools::monitored_apply")
-    # apply_func = epimedtools::monitored_apply
-    apply_func = apply
-    ewas = apply_func(d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
+    ewas = epimedtools::monitored_apply(d, 1, model_func, x_values=x_values, model_formula=model_formula, nb_fact_of_interest=nb_fact_of_interest, expected_nb_coef=expected_nb_coef, expected_nb_na=expected_nb_na)
   }
   print("done")
   ewas = t(ewas)
@@ -125,7 +123,8 @@ plot_res = function(
   e = s$exp_grp
 
   factors = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))
-
+  
+  # convert character as factors
   for (f in factors[-1]) {
     if (is.character(e[[f]])) {
       print(paste0("Converting ", f, " as factor."))
@@ -133,6 +132,7 @@ plot_res = function(
     }
   }
 
+  # dealing with pheno_key2
   if (missing(pheno_key2)) {
     pheno_key2 = "hb"
   }
@@ -147,6 +147,7 @@ plot_res = function(
       pheno_key2 = pheno_key      
     }
   }
+  e[is.na(e[[pheno_key]]), pheno_key2] = NA
 
   if (missing(idx_probes)) {
     idx_probes = ewas[as.character(ewas[,1])==as.character(roi[[1]]) & ewas[,2]>=roi[[2]] & ewas[,2]<=roi[[3]],4]
@@ -156,19 +157,21 @@ plot_res = function(
   #   pheno_key2 = pheno_key
   # }
 
-
   idx_probes = intersect(idx_probes, rownames(d))
   d = d[idx_probes,]
   if ("tissue" %in% factors) {
     idx_sample = rownames(e)[order(e[["tissue"]], e[[pheno_key2]], e[[pheno_key]])]
   } else if (is.factor(e[[pheno_key2]])) {
-    idx_sample = rownames(e)[order(e[[pheno_key2]], e[[pheno_key]])]
+    idx_sample = rownames(e)[order(is.na(e[[pheno_key]]), e[[pheno_key2]], e[[pheno_key]])]
+    e[idx_sample, c(pheno_key, pheno_key2)]
   } else {
     idx_sample = rownames(e)[order(e[[pheno_key]], e[[pheno_key2]])]
   }
 
+
   if (length(idx_probes) > 1) {
     # layout(matrix(c(1, 2, 2, 2, 2), 1))
+    # pdf()
     if (LAYOUT) {
       layout(matrix(c(
         c(1,2,2,2,2,4,4,4),
@@ -177,27 +180,36 @@ plot_res = function(
         c(1,2,2,2,2,3,3,3)
         ), 4, byrow=TRUE), respect=TRUE)
     }
-
-
     # PHENO
     par(mar=c(5.7, 4.1, 4.1, 0))
     if (is.factor(e[,pheno_key])) {
-      col=(1:4)[as.numeric(e[idx_sample,pheno_key])]
+      col=(1:length(levels(e[,pheno_key])))[as.numeric(e[idx_sample,pheno_key])]
+      x = as.numeric(e[idx_sample,pheno_key]) 
+      xlim=c(.5, length(levels(e[,pheno_key]))+.5)
+      xlab=""
     } else {
       col=1
+      x = e[idx_sample,pheno_key]       
+      xlim = range(x)
+      xlab=rename_results(pheno_key)
     }
     plot(
-      e[idx_sample,pheno_key], 1:length(idx_sample),
-      xlab=rename_results(pheno_key), ylab=rename_results(pheno_key2),
-      yaxt="n", yaxs = "i", main="",
+      x, 1:length(idx_sample),
+      xlab=xlab, ylab=rename_results(pheno_key2),
+      yaxt="n", xaxt="n", yaxs = "i", main="", xlim=xlim,
       col=col,
       pch=16
     )
     if (is.factor(e[[pheno_key2]])) {
-      abline(h=cumsum(table(e[[pheno_key2]])), lty=2, col="grey")
+      abline(h=cumsum(table(e[[pheno_key2]], useNA="ifany")), lty=2, col="grey")
       axis(2, at=cumsum(table(e[[pheno_key2]])) - (table(e[[pheno_key2]])/2), levels(e[[pheno_key2]]))
     }
-    # axis(1, at=c(min(e[idx_sample,pheno_key2]), max(e[idx_sample,pheno_key2])), signif(c(min(e[idx_sample,pheno_key2], na=rm=TRUE), max(e[idx_sample,pheno_key2])), 3))
+    if (is.factor(e[[pheno_key]])) {
+      axis(1, at=1:length(levels(e[[pheno_key]])), levels(e[[pheno_key]]), las=2)
+    } else {
+      axis(1)
+    }
+    # dev.off()
 
     # METH
     colors = c("cyan", "black", "red")
@@ -340,6 +352,7 @@ plot_res = function(
   }
   par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
 }
+
 
 
 

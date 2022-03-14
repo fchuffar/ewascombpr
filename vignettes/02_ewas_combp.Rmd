@@ -115,16 +115,7 @@ dim(ewas)
 
 
 if (FILTER_EWAS_FOR_DMR_CANDIDATE) {
-  # source("~/projects/expedition_5300/results/meth/common.R") ; build_dmr_candidates(pf_orig=pf, pf_chr_colname="seqnames", pf_pos_colname="start")
   dmr_candidates = mbuild_dmr_candidates(pf=pf, pf_chr_colname="chr", pf_pos_colname="pos")
-  # dmr_candidates = dmr_candidates[sapply(dmr_candidates, length) > 1]
-  # idx_probes = unique(unlist(dmr_candidates))
-  # idx_probes = intersect(idx_probes, rownames(d))
-  # length(dmr_candidates)
-  # length(idx_probes)
-  # USE_PARAPPLY = FALSE
-  # idx_probes = idx_probes[74188:74500]
-
   dmr_candidates = dmr_candidates[sapply(dmr_candidates, length) > 1]
   idx_probes = unique(unlist(dmr_candidates))
   idx_probes = intersect(idx_probes, rownames(ewas))
@@ -135,9 +126,6 @@ if (FILTER_EWAS_FOR_DMR_CANDIDATE) {
 ewas = ewas[idx_probes,]
 
 dim(ewas)
-
-# tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
-# ewas = mewas_func(d=d[tmp_probes,], e, USE_PARAPPLY, pheno_key=pheno_key)
 ```
 
 
@@ -306,14 +294,18 @@ print(results_filename)
 write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
 dm_regions = annotatr::read_regions(con=results_filename, genome=genome, format="bed")
 # Build the annotations (a single GRanges object)
-if (! exists("annotations")) {
+if (!exists("annotations_list")) {
+  annotations_list = list()
+}
+if (! genome %in% names(annotations_list)) {
   # annots = paste0(genome, c("_lncrna_gencode"))
   # annots = paste0(genome, c('_cpgs', '_basicgenes', "_lncrna_gencode", "_enhancers_fantom"))
   # annots = paste0(genome, c('_cpgs', '_basicgenes', "_enhancers_fantom"))
   # annots = paste0(genome, c('_cpgs', '_basicgenes'))
   annots = paste0(genome, c("_basicgenes"))
-  annotations = annotatr::build_annotations(genome=genome, annotations=annots)  
+  annotations_list[[genome]] = annotatr::build_annotations(genome=genome, annotations=annots)  
 }
+annotations = annotations_list[[genome]]
 # Intersect the regions we read in with the annotations
 dm_annotated = annotatr::annotate_regions(
     regions = dm_regions,
