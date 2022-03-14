@@ -103,20 +103,21 @@ if (length(rownames(attr(stats::terms(as.formula(model_formula)), "factor"))) < 
   nb_fact_of_interest = 1  
 }
 ewas_orig = ewas = mewas_func2(d=d, e=e, USE_PARAPPLY=USE_PARAPPLY, model_formula=model_formula, model_func_name=model_func_name, nb_fact_of_interest=nb_fact_of_interest)
+if (nrow(d)==nrow(ewas)) {
+  rownames(ewas) = rownames(ewas_orig) = rownames(d)  
+} else {
+  stop(paste0("ewas do not have the same dimension as d."))
+}
 
-if (FALSE) {
-  # source("~/projects/expedition_5300/results/meth/common.R") ; build_feats_epic_grch38(pf_orig=pf, pf_chr_colname="seqnames", pf_pos_colname="start")
-  feats_epic_grch38 = mbuild_feats_epic_grch38(pf_orig=pf, pf_chr_colname="chr", pf_pos_colname="pos")
-  # feats_epic_grch38 = feats_epic_grch38[sapply(feats_epic_grch38, length) > 1]
-  # idx_probes = unique(unlist(feats_epic_grch38))
-  # idx_probes = intersect(idx_probes, rownames(d))
-  # length(feats_epic_grch38)
-  # length(idx_probes)
-  # USE_PARAPPLY = FALSE
-  # idx_probes = idx_probes[74188:74500]
+dim(ewas)
+ewas = ewas[!is.na(ewas[,"lpv"]),]
+dim(ewas)
 
-  feats_epic_grch38 = feats_epic_grch38[sapply(feats_epic_grch38, length) > 1]
-  idx_probes = unique(unlist(feats_epic_grch38))
+
+if (FILTER_EWAS_FOR_DMR_CANDIDATE) {
+  dmr_candidates = mbuild_dmr_candidates(pf=pf, pf_chr_colname="chr", pf_pos_colname="pos")
+  dmr_candidates = dmr_candidates[sapply(dmr_candidates, length) > 1]
+  idx_probes = unique(unlist(dmr_candidates))
   idx_probes = intersect(idx_probes, rownames(ewas))
 } else {
   idx_probes = rownames(ewas)
@@ -124,10 +125,7 @@ if (FALSE) {
 
 ewas = ewas[idx_probes,]
 
-ewas = ewas[!is.na(ewas[,"lpv"]),]
-
-# tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
-# ewas = mewas_func(d=d[tmp_probes,], e, USE_PARAPPLY, pheno_key=pheno_key)
+dim(ewas)
 ```
 
 
