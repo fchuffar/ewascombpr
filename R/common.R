@@ -134,9 +134,9 @@ plot_res = function(
 
   # dealing with pheno_key2
   if (missing(pheno_key2)) {
-    pheno_key2 = "hb"
-  }
-  if (!pheno_key2 %in% colnames(e)) {
+  #   pheno_key2 = "hb"
+  # }
+  # if (!pheno_key2 %in% colnames(e)) {
     if (length(factors)>=3) {
       if (is.factor(e[[factors[3]]])) {
         pheno_key2 = factors[3]

@@ -1,4 +1,4 @@
-cd ~/projects/expedition_5300/results/GSE162606/vignettes
+cd ~/projects/expedition_5300/results/cmslimapuno/vignettes
 source config
 echo ${study}
 echo ${project}
