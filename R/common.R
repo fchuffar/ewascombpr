@@ -286,9 +286,9 @@ plot_res = function(
         pval_ewas = combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),4]
         pval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),5]
         qval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),6]
-        pval_ewas[pval_ewas==0] = 10^-45
-        pval_slk [pval_slk ==0] = 10^-45
-        qval_slk [qval_slk ==0] = 10^-45
+        # pval_ewas[pval_ewas==0] = 10^-45
+        # pval_slk [pval_slk ==0] = 10^-45
+        # qval_slk [qval_slk ==0] = 10^-45
       } else {
         pval_ewas = 10^-ewas[rownames(ewas) %in% idx_probes, 2]
         # pval_ewas[pval_ewas==0] = 10^-45
@@ -303,7 +303,7 @@ plot_res = function(
         xlab="", ylab="-log10(pv)",
         # yaxt="n",
         # main=paste0("meth~", gene),
-        ylim=c(0, min(45, max(-log10(pval_slk), -log10(pval_ewas)))),
+        ylim=c(0, max(-log10(pval_slk), -log10(pval_ewas))),
         type="l", lty=3
       )
       # axis(4)

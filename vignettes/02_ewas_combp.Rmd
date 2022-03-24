@@ -145,15 +145,6 @@ head(ewas)
 head(pf[,1:6])
 lpval = ewas[,"lpv"]
 
-# layout(matrix(1:2, 1), respect=TRUE)
-# plot(density(lpval), main="original pval")
-# # if (max(lpval)>40) {
-# #   lpval = 40*lpval/max(lpval)
-# # }
-# lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
-# # lpval[lpval > 40] = 40
-# plot(density(lpval), main="corrected pval")
-
 pval = 10^-lpval
 
 # build and write bed file
