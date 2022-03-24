@@ -23,6 +23,7 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 #
 source("../R/common.R")
 source("config")
+if (file.exists("00_local_config")) {source("00_local_config")}
 
 # source("modelcall.R")
 
