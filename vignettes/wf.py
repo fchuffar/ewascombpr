@@ -12,5 +12,5 @@ rule target:
 pwd
           """
 
-include: "basic_rules.py"
+include: "rules.py"
 
