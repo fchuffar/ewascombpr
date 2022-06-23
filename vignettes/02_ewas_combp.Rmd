@@ -93,6 +93,10 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 
 # EWAS
 
+
+`r model_formula`
+
+
 ```{r ewas}
 USE_PARAPPLY = TRUE
 if (length(rownames(attr(stats::terms(as.formula(model_formula)), "factor"))) < 3) {
@@ -136,8 +140,11 @@ dim(ewas)
 
 
 ```{r plot_ewas}
-layout(matrix(1:2, 1), respect=TRUE,)
+layout(matrix(1:4, 2, byrow=TRUE), respect=TRUE,)
 plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
+plot(density(ewas[,"lpv"]), main="lpv distribution", pch=".", xlim=c(0,100))
+plot(density(10^-ewas[,"lpv"]), main="pv distribution", pch=".", xlim=c(0,1))
+plot(sort(-log10(runif(nrow(ewas)))) , sort(ewas[,"lpv"]), main="million dollar plot", pch=".")
 ```
 
 ```{r build_bed}

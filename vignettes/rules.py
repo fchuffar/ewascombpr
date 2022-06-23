@@ -29,3 +29,16 @@ echo "gse = 'GSE{wildcards.gse}'; rmarkdown::render('{input.rmd_script}', output
 """
 
 
+rule build_rfe_study:
+    input:
+      rmd_script="{prefix}/01_RefFreeEWAS.Rmd",
+      study_orig="{prefix}/study_{studysuffix}.rds"      ,
+    output:
+      study_rfe="{prefix}/study_rfe{studysuffix}.rds"      ,
+    threads: 1
+    shell:"""
+export PATH="/summer/epistorage/opt/bin:$PATH"
+export PATH="/summer/epistorage/miniconda3/bin:$PATH"
+cd {wildcards.prefix}
+echo "study_filename='{input.study_orig}' ; confounder=NULL ; sd_thresh=0.05 ; output_file=paste0('05_RefFreeEWAS_', sd_thresh, '_', study_filename, '.html') ; rmarkdown::render('{input.rmd_script}', output_file=output_file)" | Rscript -
+"""

@@ -1,5 +1,8 @@
 if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
   
+  
+#ewas_orig = ewas = mewas_func2(d=d, e=e, USE_PARAPPLY=USE_PARAPPLY, model_formula=model_formula, model_func_name=model_func_name, nb_fact_of_interest=nb_fact_of_interest)
+
 ewas_func2 = function(d, e, USE_PARAPPLY, model_formula, nb_fact_of_interest=1, model_func_name="modelcalllm") {
   model_func = get(model_func_name)
   y_name = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[1]
@@ -37,6 +40,8 @@ if (!exists("mewas_func2")) mewas_func2 = memoise::memoise(ewas_func2)
 modelcalllm = function(meth, x_values, model_formula, nb_fact_of_interest, expected_nb_coef, expected_nb_na=0) {
   # meth = d["cg07164639",]
   # meth = d[140340,]
+  # meth = d[1,]
+
 
   # model
   options(contrasts=c("contr.sum", "contr.poly"))
@@ -258,7 +263,7 @@ plot_res = function(
     if (is.factor(e[[pheno_key]])) {
       par(mar=c(5.7, 4.1, 0, 0))
       # if (is.null(confounder)) {
-        boxplot(meth~pheno+probes, df, las=2, col=1:length(unique(na.omit(df$pheno))), ylim=c(0,1), cex.axis=0.5,
+        boxplot(meth~pheno+probes, df, las=2, col=1:length(unique(na.omit(df$pheno))), ylim=c(0,1),
           ylab="methylation",
           #, yaxt="n",
           cex.axis=0.5

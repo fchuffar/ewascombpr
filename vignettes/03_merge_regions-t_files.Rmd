@@ -343,6 +343,13 @@ ewass =  lapply(feats_filenames, function(feats_filename) {
   tmpidx_probes = intersect(unique(unlist(ffeat_indexed_probes)), rownames(d))
   d = s$data[tmpidx_probes,]
   e = s$exp_grp
+  
+  for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
+    if (is.character(e[[f]])) {
+      print(paste0("Converting ", f, " as factor."))
+      e[[f]] = as.factor(e[[f]])
+    }
+  }
 
   # study_filename = "study_exp5300_meth_saliva_rnbeads.rds_rfek2.rds"
   # study_filename = "study_exp5300_meth_saliva_rnbeads.rds_rfek5.rds"

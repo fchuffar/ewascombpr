@@ -1,0 +1,274 @@
+---
+title: "RefFreeEWAS"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
+source("../R/common.R")
+```
+
+
+```{r params}
+source("params_default.R")
+study_filename = paste0("study_", gse, ".rds")
+confounder=NULL
+sd_thresh=0.05 
+# output_file=paste0("01_RefFreeEWAS_", sd_thresh, "_", study_filename, ".html")
+# rmarkdown::render("01_RefFreeEWAS.Rmd", output_file=output_file)
+# study_filename="study_exp5300_meth_saliva_rnbeads.rds" ; confounder=NULL ; sd_thresh=0.05 ; output_file=paste0("05_RefFreeEWAS_", sd_thresh, "_", study_filename, ".html") ; rmarkdown::render("05_RefFreeEWAS.Rmd", output_file=output_file)
+```
+
+
+
+# Method
+
+*Many*-steps method:
+
+- filtering probes (27k, sd)
+- adjusting confounding factors
+- defining k using PCA
+- defining LF with `RefFreeEWAS`
+- defining LF with `lfmm`
+
+# Data
+
+```{r study}
+study = mreadRDS(study_filename)
+e = study$exp_grp
+pf = study$platform
+d = study$data
+d = d[rownames(pf),rownames(e)]
+```
+
+
+# Filtering Samples NA
+
+```{r}
+idx_samples = colnames(d)
+if (! exists("apply_func")) {apply_func = apply}
+prop_na_col =  apply_func(is.na(d[,idx_samples]), 2, sum) / nrow(d[,idx_samples])
+idx_samples = names(prop_na_col)[prop_na_col<.05]
+print(paste0("#samples removed: ", sum(prop_na_col>=.05)))
+e = e[idx_samples,]
+d = d[,rownames(e)]
+```
+
+# Filtering probes NA
+
+```{r filter_nona_nochrxy}
+pf_meth27k = pf
+idx_probes27k = intersect(rownames(pf_meth27k), rownames(d))
+idx_probes27k = intersect(idx_probes27k, rownames(pf_meth27k)[!pf_meth27k[,1] %in% c("chrX", "chrY", "*")])
+pf_meth27k = pf_meth27k[idx_probes27k,]
+
+dim(d)
+idx_probes_nona = idx_probes27k[apply(is.na(d[idx_probes27k,]), 1, sum) == 0]
+d = d[idx_probes_nona,]
+pf = pf[idx_probes_nona,]
+dim(d)
+```
+
+```{r echo=TRUE, results="verbatim"}
+head(d[,1:5])
+dim(d)
+head(e[,1:5])
+dim(e)
+```
+
+
+# Filtering probes according to sd
+
+
+```{r filter_sd, echo=TRUE, results="verbatim"}
+print("Filtering probes according to sd")
+sds = apply(d, 1, sd)
+sum(is.na(sds))
+sds = sds[!is.na(sds)]
+plot(density(sds))
+abline(v=sd_thresh)
+idx_probes_sd = names(sds)[sds > sd_thresh]
+# idx_probes_sd
+length(idx_probes_sd)
+length(sds)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot(density(sds), main=paste("sd per probe dist."))
+abline(v=sd_thresh)
+plot(density(d                ), main=paste("initial meth. distrib."), lty=2)
+den = density(d[idx_probes_sd,])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=2, lty=1)
+den = density(d[setdiff(rownames(d),idx_probes_sd),])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=4, lty=1)
+legend("topright", c("all", paste0("sd>", sd_thresh), paste0("sd<=", sd_thresh)), col=c(1,2,4), lty=c(2,1,1))
+```
+
+# Adjusting on confounder
+
+```{r confounder}
+if (!is.null(confounder)) {
+  print("Adjusting on confounder")
+  apply_func = apply
+  apply_func = epimedtools::monitored_apply
+  d_confresid = apply_func(t(t(idx_probes_sd)), 1, function(probe) {
+    m = lm(d[probe,]~e[[confounder]])
+    tmp_d = m$coefficients[[1]] + m$residuals
+    return(tmp_d)
+  })
+  d_confresid = t(d_confresid)
+  rownames(d_confresid) = idx_probes_sd
+} else {
+  d_confresid = d[idx_probes_sd,]
+}
+head(d_confresid)
+dim(d_confresid)  
+```
+
+# Define k using PCA
+
+```{r pca, echo=TRUE, results="verbatim"}
+data = t(d_confresid)
+dim(data)
+# idx = colnames(data)[apply(is.na(data), 2, sum) == 0]
+# data = data[,idx]
+pca = prcomp(data, scale=FALSE)
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+
+layout(matrix(1:6,2), respect=TRUE)
+barplot(p[1:min(50, length(p))])
+
+idx_samples = rownames(pca$x)
+cols = as.numeric(as.factor(e[idx_samples, "gender"]))
+# cols = as.numeric(as.factor(e[idx_samples, "plate"]))
+# cols = as.numeric(as.factor(paste0(e[idx_samples, "gender"], e[idx_samples, "age"]>40)))
+cols = as.numeric(as.factor(paste0(e[idx_samples, "trackingsheet"])))
+# cols = as.numeric(as.factor(paste0(e[idx_samples, "trackingsheet"], e[idx_samples, "age"]>40)))
+# cols = as.numeric(as.factor(paste0(e[idx_samples, "trackingsheet"], e[idx_samples, "gender"])))
+# cols = as.numeric(as.factor(paste0(e[idx_samples, "diseasestatus"])))
+cols = as.numeric(as.factor(paste0(e[idx_samples, "trackingsheet"], e[idx_samples, "dataset"])))
+
+
+
+i = 3
+j = 2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=cols)
+
+i = 1
+j = 3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=cols)
+
+i = 1
+j = 2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=cols)
+
+i = 4
+j = 3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=cols)
+
+i = 4
+j = 5
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=cols)
+```
+
+
+# RefFreeEWAS
+
+```{r RefFreeEWAS}
+# library(RefFreeEWAS)
+call_rfe = function(Dsub, k) {
+    foo = RefFreeEWAS::RefFreeCellMixArray(Dsub, K=k, iters=9, dist.method="manhattan")
+    Aest = t(foo[[as.character(k)]]$Omega)
+    Test = foo[[as.character(k)]]$Mu
+  return(Aest)
+}
+
+for(k in 2:kmax) {
+  res_A = call_rfe(d_confresid, k=k)
+  # hm = proportion.heatmap(res_A, clusterCols=TRUE, clusterRows=TRUE)
+  # saveRDS(res_A, paste0("reffreeewas_a_", k, "_", sd_thresh, "_", study_filename, ".rds"))
+  foo = t(res_A)
+  head(foo)
+  
+  rownames(foo) == rownames(e)
+  colnames(foo) = paste0("rfek", k, ".", colnames(foo))
+  head(foo)
+  
+  e = cbind(e, foo[rownames(e), ])
+}
+
+```
+
+
+# lfmm
+
+```{r lfmm}
+# library(lfmm)
+call_lfmm = function(Dsub, k) {
+  # Dsub = d_confresid
+  foo = lfmm::lfmm_ridge(Y=t(Dsub), X=rep(1, ncol(Dsub)), K=k)
+  Aest = t(foo$U)
+  dim(foo$U)
+  colnames(Aest) = colnames(Dsub)
+  rownames(Aest) = 1:k
+  # Test = foo[[as.character(k)]]$Mu
+  return(Aest)
+}
+
+for(k in 2:kmax) {
+  print(k)
+  res_A = call_lfmm(d_confresid, k=k)
+  foo = t(res_A)
+  head(foo)
+  
+  rownames(foo) == rownames(e)
+  colnames(foo) = paste0("lfmk", k, ".", colnames(foo))
+  head(foo)
+
+  e = cbind(e, foo[rownames(e), ])  
+}
+```
+
+
+```{r lfmm}
+idx_col = colnames(e)
+idx_col = idx_col[grep("rfe", idx_col)]
+idx_col
+rndlf = e[,idx_col]
+colnames(rndlf) = gsub("rfe", "rnd", colnames(rndlf))
+set.seed(1)
+rndlf = rndlf[sample(1:nrow(rndlf)),]
+e = cbind(e, rndlf)  
+```
+
+
+```{r}
+studyrfe_filename = paste0("study_", gse, "rfe.rds")
+s = epimedtools::create_study()
+s$data = d
+s$exp_grp = e
+s$platform = pf
+# Save
+s$save(studyrfe_filename)
+```
+
+
+
+
+
+
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```

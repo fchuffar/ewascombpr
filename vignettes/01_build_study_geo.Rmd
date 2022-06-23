@@ -1,5 +1,5 @@
 ---
-title: "Build methylation study"
+title: "Build Illumina methylation study"
 author: "Florent Chuffart"
 date: "`r Sys.Date()`"
 output: 
@@ -11,37 +11,13 @@ output:
 ---
 
 
-```{r, echo=FALSE, eval=TRUE}
-knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
-if (!exists("gse")) {gse = "GSE40279"}
+```{r echo=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
 ```
 
-```{r batch, eval=FALSE}
-for (gse in c( 
-  "GSE41037", 
-  "GSE41169",
-  "GSE40279",
-  "GSE20067",
-  "GSE20236",
-  "GSE19711",
-  "GSE19711",
-  "GSE42861",
-  "GSE111223",
-  "GSE34035",
-  "GSE28746", 
-  "GSE34035",
-  # "GSE120610",
-  "GSE159899",
-  "GSE145254"
-  "GSE179759"
-)) {
-  print(paste0("************ ", gse, " ************"))
-  s_filename = paste0("study_", gse, ".rds")
-  if (!file.exists(s_filename)) 
-  {
-    rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".Rmd"))    
-  }
-}
+
+```{r params}
+source("params_default.R")
 ```
 
 
@@ -55,9 +31,8 @@ This vignette
 
 methylation study for `r gse`.
 
-```{r build, echo=FALSE, eval=TRUE}
+```{r, echo=FALSE, eval=TRUE}
 # Build
-s_filename = paste0("study_", gse, ".rds")
 print(paste0("#####", gse))
 s_tmp = epimedtools::create_study()
 s_tmp$gse = gse
@@ -66,6 +41,7 @@ dim(foo)
 s = epimedtools::create_study()
 # data
 s$data = foo
+dim(s$data)
 # exp_grp from epimed_DB
 url = paste0("http://epimed.univ-grenoble-alpes.fr/database/parameters/",gse)
 df1 = read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE, dec=".", na.strings="", row.names=1)
@@ -79,8 +55,9 @@ if (s_tmp$platform_name=="GPL8490") {
   print("450k")
   library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
   pf450k = data.frame(getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19))
+  dim(pf450k)
   s$platform = pf450k  
-} else if (s_tmp$platform_name %in% c("GPL21145", "GPL23976")) {
+} else if (s_tmp$platform_name=="GPL23976") {
   print("epic")
   library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)  
   pfepic = data.frame(getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19))
@@ -92,6 +69,10 @@ if (s_tmp$platform_name=="GPL8490") {
 # Check
 dim(s$data)
 dim(s$exp_grp)
+s$data = s$data[,!colnames(s$data)%in%sample_blacklist]
+s$exp_grp = s$exp_grp[!rownames(s$exp_grp)%in%sample_blacklist,]
+dim(s$data)
+dim(s$exp_grp)
 if (sum(!rownames(s$exp_grp) %in% colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
 s$exp_grp = s$exp_grp[colnames(s$data),]
 if (sum(rownames(s$exp_grp) != colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
@@ -100,13 +81,27 @@ dim(s$platform)
 dim(s$data)
 if (sum(!rownames(s$data) %in% rownames(s$platform)) !=0 ) {warning(paste0("problem pf names ", gse))}
 s$platform = s$platform[intersect(rownames(s$data), rownames(s$platform)),]
+dim(s$platform)
 s$data = s$data[rownames(s$platform),]
 if (sum(rownames(s$data) != rownames(s$platform)) !=0 ) {stop(paste0("problem pf names ", gse))}
 
+# covariates
+for (cov in covariates) {
+  if (is.character(s$exp_grp[[cov]])) {
+    s$exp_grp[[cov]] = as.factor(s$exp_grp[[cov]])
+  }
+}
+
+```{r results="verbatim"}
 # Save
+s_filename = paste0("study_", gse, ".rds")
+print(paste0("Writing ", s_filename, "..."))
 s$save(s_filename)
 df = cbind(s$exp_grp, t(s$data[,rownames(s$exp_grp)]))
-saveRDS(df, paste0("df_", gse, ".rds"))
+
+df_filename = paste0("df_", gse, ".rds")
+print(paste0("Writing ", df_filename, "..."))
+saveRDS(df, df_filename)
 ```
 
 # Session Information
