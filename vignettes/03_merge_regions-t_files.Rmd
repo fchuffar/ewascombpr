@@ -20,6 +20,7 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```{r params}
 source("../R/common.R")
 source("config")
+if (file.exists("00_local_config")) {source("00_local_config")}
 
 # if (!exists("study_filename"))  study_filename = "study_GSE41037.rds"   ;
 # if (!exists("model_func_name")) model_func_name = "modelcallrlmcecil"         ;
