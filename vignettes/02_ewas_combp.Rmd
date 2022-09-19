@@ -171,7 +171,7 @@ bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
 bed[,1] = as.character(bed[,1])
 bed = bed[order(bed[,1], bed[,2]),]
 write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
-# bed = read.table(ewas_filename, sep="\t", header=TRUE)
+# bed_on_disk = read.table(bed_ewas_filename, sep="\t", header=TRUE)
 ```
 
 EWAS results is exporetd as: 
