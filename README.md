@@ -4,9 +4,13 @@ A line that pipes epimedtools DNA methylation study to an ewas then to combp.
 
 # Prerequisits
 
-Following packages are required:
+Comb-p (https://github.com/brentp/combined-pvalues) need to be installed and launchable using `comb-p` command line call.
+
+bioconductor packages needs to be installed:
+
 ```
-IlluminaHumanMethylation450kanno.ilmn12.hg19
+BiocManager::install("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+BiocManager::install("TxDb.Hsapiens.UCSC.hg19.knownGene")
 ``` 
  
 # Quick launch

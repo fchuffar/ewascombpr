@@ -1,14 +1,15 @@
-cd ~/projects/expedition_5300/results/cmslimapuno/vignettes
+cd ~/projects/ewascombpr/results/ewascombpr/vignettes
 source config
 echo ${study}
 echo ${project}
 rsync -auvP ~/projects/${project}/results/${study}/ cargo:~/projects/${project}/results/${study}/
-  
+
 # launch default pipeline
 snakemake -s wf.py -pn
 
 # launch default pipeline
-cp wf.py wf_${study}.py
-cp basic_rules.py ${study}_rules.py
+cp preproc.sh 00_preproc.sh
+cp wf.py 00_wf_local.py
+cp rules.py 00_rules_local.py
 
-snakemake -s wf_${study}.py -pn
+snakemake -s 00_wf_local.py -pn

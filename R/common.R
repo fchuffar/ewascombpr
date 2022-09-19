@@ -1,5 +1,8 @@
 if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
   
+  
+#ewas_orig = ewas = mewas_func2(d=d, e=e, USE_PARAPPLY=USE_PARAPPLY, model_formula=model_formula, model_func_name=model_func_name, nb_fact_of_interest=nb_fact_of_interest)
+
 ewas_func2 = function(d, e, USE_PARAPPLY, model_formula, nb_fact_of_interest=1, model_func_name="modelcalllm") {
   model_func = get(model_func_name)
   y_name = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[1]
@@ -37,6 +40,8 @@ if (!exists("mewas_func2")) mewas_func2 = memoise::memoise(ewas_func2)
 modelcalllm = function(meth, x_values, model_formula, nb_fact_of_interest, expected_nb_coef, expected_nb_na=0) {
   # meth = d["cg07164639",]
   # meth = d[140340,]
+  # meth = d[1,]
+
 
   # model
   options(contrasts=c("contr.sum", "contr.poly"))
@@ -258,7 +263,7 @@ plot_res = function(
     if (is.factor(e[[pheno_key]])) {
       par(mar=c(5.7, 4.1, 0, 0))
       # if (is.null(confounder)) {
-        boxplot(meth~pheno+probes, df, las=2, col=1:length(unique(na.omit(df$pheno))), ylim=c(0,1), cex.axis=0.5,
+        boxplot(meth~pheno+probes, df, las=2, col=1:length(unique(na.omit(df$pheno))), ylim=c(0,1),
           ylab="methylation",
           #, yaxt="n",
           cex.axis=0.5
@@ -286,9 +291,9 @@ plot_res = function(
         pval_ewas = combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),4]
         pval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),5]
         qval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% rownames(sub_ewas),6]
-        pval_ewas[pval_ewas==0] = 10^-45
-        pval_slk [pval_slk ==0] = 10^-45
-        qval_slk [qval_slk ==0] = 10^-45
+        # pval_ewas[pval_ewas==0] = 10^-45
+        # pval_slk [pval_slk ==0] = 10^-45
+        # qval_slk [qval_slk ==0] = 10^-45
       } else {
         pval_ewas = 10^-ewas[rownames(ewas) %in% idx_probes, 2]
         # pval_ewas[pval_ewas==0] = 10^-45
@@ -303,7 +308,7 @@ plot_res = function(
         xlab="", ylab="-log10(pv)",
         # yaxt="n",
         # main=paste0("meth~", gene),
-        ylim=c(0, min(45, max(-log10(pval_slk), -log10(pval_ewas)))),
+        ylim=c(0, max(-log10(pval_slk), -log10(pval_ewas))),
         type="l", lty=3
       )
       # axis(4)

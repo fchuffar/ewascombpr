@@ -20,15 +20,16 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```{r params}
 source("../R/common.R")
 source("config")
+if (file.exists("00_local_config")) {source("00_local_config")}
 
-if (!exists("study_filename"))  study_filename = "study_cecile_meth_xu.rds"   ;
-if (!exists("model_func_name")) model_func_name = "modelcallrlmcecil"         ;
-# if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
-# if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
-
-if (file.exists(paste0(model_func_name, ".R"))) {
-  source(paste0(model_func_name, ".R"))
-}
+# if (!exists("study_filename"))  study_filename = "study_GSE41037.rds"   ;
+# if (!exists("model_func_name")) model_func_name = "modelcallrlmcecil"         ;
+# # if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
+# # if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
+#
+# if (file.exists(paste0(model_func_name, ".R"))) {
+#   source(paste0(model_func_name, ".R"))
+# }
 ```
 
 
@@ -36,7 +37,9 @@ if (file.exists(paste0(model_func_name, ".R"))) {
 ```{r prefix}
 # prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
 # prefix2 = paste0(prefix, "_", pval_thresh)
-prefix2 = paste0(study_filename, "_", model_func_name)
+# prefix2 = paste0(study_filename, "_", model_func_name)
+# prefix2 = paste0(study_filename, "_", model_func_name)
+prefix2 = "meth"
 ```
 
 
@@ -46,16 +49,16 @@ prefix2 = paste0(study_filename, "_", model_func_name)
 ## DMR
 
 ```{r feats}
-print(paste0("Loading ", study_filename, "..."))
-s = mreadRDS(study_filename)
-d = s$data
-e = s$exp_grp
-pf = s$platform
+# print(paste0("Loading ", study_filename, "..."))
+# s = mreadRDS(study_filename)
+# d = s$data
+# e = s$exp_grp
+# pf = s$platform
 
 
 
 feats_filenames = list.files("./", "*.regions-t.bed", )
-feats_filenames = feats_filenames[grep(study_filename, feats_filenames)]
+# feats_filenames = feats_filenames[grep(study_filename, feats_filenames)]
 feats_filenames
 
 
@@ -63,15 +66,18 @@ feats_filenames
 feats = lapply(feats_filenames, function(feats_filename) {
   # feats_filename = paste0("dmr_", study_filename, "_", model_func_name, "_", model_formula, "_", pval_thresh, ".regions-t.bed")
   if (file.exists(feats_filename)) {
-    feats = read.table(feats_filename, comment="@", header=TRUE)
     print(feats_filename)
+    model_func_name =  strsplit(feats_filename, "rds_|_meth")[[1]][2]
+    model_func_name
+    model_formula =  strsplit(feats_filename, paste0(model_func_name, "_|_[0|1]"))[[1]][2]
+    model_formula
+    study_filename =  strsplit(feats_filename, paste0("dmr_|_", model_func_name))[[1]][2]
+    study_filename
+
+    feats = read.table(feats_filename, comment="@", header=TRUE)
     # print(dim(feats))
     # feats = feats[order(log10(feats$z_sidak_p)),][1:min(ntop, nrow(feats)),]
     # feats = feats[order(log10(feats$z_sidak_p)),]
-    model_formula =  strsplit(feats_filename, "rds_|_0")[[1]][2]
-    model_formula
-    study_filename =  strsplit(feats_filename, paste0("dmr_|_", substr(model_formula, 1, 5)))[[1]][2]
-    study_filename
     feats$model_formula = model_formula
     feats$study_filename = study_filename
     feats$feats_filename = feats_filename
@@ -155,9 +161,35 @@ head(fat_feats)
 
 
 ```{r ffeat_indexed_probes}
+pfs = lapply(feats_filenames, function(feats_filename) {
+  # feats_filename = paste0("dmr_", study_filename, "_", model_func_name, "_", model_formula, "_", pval_thresh, ".regions-t.bed")
+  if (file.exists(feats_filename)) {
+    print(feats_filename)
+    model_func_name =  strsplit(feats_filename, "rds_|_meth")[[1]][2]
+    model_func_name
+    model_formula =  strsplit(feats_filename, paste0(model_func_name, "_|_[0|1]"))[[1]][2]
+    model_formula
+    study_filename =  strsplit(feats_filename, paste0("dmr_|_", model_func_name))[[1]][2]
+    study_filename
+
+    print(paste0("Loading ", study_filename, "..."))
+    s = mreadRDS(study_filename)
+    # d = s$data
+    # e = s$exp_grp
+    pf = s$platform
+    return(pf[,1:2])
+  } 
+  return(NULL)
+})
+
+tmp_probes = unique(unlist(lapply(pfs, rownames)))
+
+pfs = do.call(rbind, pfs)
+pfs = pfs[tmp_probes,]
+
 print("# # ffeat_indexed_probes")
 # meth pf
-pf_orig = pf
+pf_orig = pfs
 pf_chr_colname = colnames(pf_orig)[1]
 pf_pos_colname = colnames(pf_orig)[2]
 
@@ -299,9 +331,12 @@ hmp(data)
 
 ```{r ewass}
 ewass =  lapply(feats_filenames, function(feats_filename) {
-  model_formula =  strsplit(feats_filename, "rds_|_0")[[1]][2]
+  print(feats_filename)
+  model_func_name =  strsplit(feats_filename, "rds_|_meth")[[1]][2]
+  model_func_name
+  model_formula =  strsplit(feats_filename, paste0(model_func_name, "_|_[0|1]"))[[1]][2]
   model_formula
-  study_filename =  strsplit(feats_filename, paste0("dmr_|_", substr(model_formula, 1, 5)))[[1]][2]
+  study_filename =  strsplit(feats_filename, paste0("dmr_|_", model_func_name))[[1]][2]
   study_filename
   print(paste0("Loading ", study_filename, " for ewas on ", nrow(feats), " feats..."))
   s = mreadRDS(study_filename)
@@ -309,6 +344,13 @@ ewass =  lapply(feats_filenames, function(feats_filename) {
   tmpidx_probes = intersect(unique(unlist(ffeat_indexed_probes)), rownames(d))
   d = s$data[tmpidx_probes,]
   e = s$exp_grp
+  
+  for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
+    if (is.character(e[[f]])) {
+      print(paste0("Converting ", f, " as factor."))
+      e[[f]] = as.factor(e[[f]])
+    }
+  }
 
   # study_filename = "study_exp5300_meth_saliva_rnbeads.rds_rfek2.rds"
   # study_filename = "study_exp5300_meth_saliva_rnbeads.rds_rfek5.rds"
@@ -382,7 +424,15 @@ if (length(ewass)>1)  {
 length(tmp_probes)
 tmp_probes = intersect(rownames(pf_orig), tmp_probes)
 tmp_probes = intersect(unique(unlist(ffeat_indexed_probes)), tmp_probes)
+
+ffeat_indexed_probes = lapply(ffeat_indexed_probes, function(pbs) {
+  intersect(pbs, tmp_probes)
+})
 length(tmp_probes)
+length(ffeat_indexed_probes)
+ffeat_indexed_probes = ffeat_indexed_probes[sapply(ffeat_indexed_probes, length)>0]
+length(ffeat_indexed_probes)
+
 
 data = sapply(ewass, function(ewas) {
   ewas[tmp_probes,1]
@@ -652,7 +702,7 @@ if ("z_sidak_p"%in% colnames(results)) {
 #   paste0("http://epimed.univ-grenoble-alpes.fr/downloads/florent/expedition_5300/results/meth/", output_pdf_filename)
 # })
 
-results_filename = paste0("global_results_", prefix2, ".xlsx")
+results_filename = paste0("merged_results_", prefix2, ".xlsx")
 print(results_filename)
 WriteXLS::WriteXLS(results, results_filename, FreezeCol=6, FreezeRow=1, BoldHeaderRow=TRUE, AdjWidth=TRUE)
 ```
