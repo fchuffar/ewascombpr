@@ -189,7 +189,7 @@ EWAS results is exporetd as:
 
 ```{r combp}
 # Run comb-p, run!!
-cmd = "comb-p"
+cmd = "/summer/epistorage/opt/combined-pvalues/cpv/comb-p"
 arg = paste0("pipeline -c 5 --seed ", pval_thresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
 print(paste(cmd, arg))
 system2(cmd, arg)
