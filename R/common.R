@@ -1,3 +1,46 @@
+dmprocr_get_probe_names = function (gene, pf_meth, pf_chr_colname = "Chromosome", pf_pos_colname = "Start", 
+    up_str = 5000, dwn_str = 5000) 
+{
+    if (substr(gene[[1]], 1, 3) != "chr") {
+        gene[[1]] = paste0("chr", gene[[1]])
+    }
+    chr = gene[[1]]
+    strand = gene[[6]]
+    gene_name = gene[[4]]
+    beg = as.numeric(gene[[2]])
+    end = as.numeric(gene[[3]])
+    if (nrow(pf_meth) == 0) {
+        warning(paste0("No probes for gene ", gene[[4]], "(", 
+            gene[[5]], ")."))
+        return(NULL)
+    }
+    if (substr(pf_meth[1, pf_chr_colname], 1, 3) != "chr") {
+        pf_meth[, pf_chr_colname] = paste0("chr", pf_meth[, pf_chr_colname])
+    }
+    if (strand == "-") {
+        off_set_beg = dwn_str
+        off_set_end = up_str
+        tss = end
+    }
+    else {
+        off_set_beg = up_str
+        off_set_end = dwn_str
+        tss = beg
+    }
+    probe_idx = rownames(pf_meth)[!is.na(pf_meth[[pf_pos_colname]]) & 
+        !is.na(pf_meth[[pf_chr_colname]]) & pf_meth[[pf_chr_colname]] == 
+        chr & pf_meth[[pf_pos_colname]] >= tss - up_str & pf_meth[[pf_pos_colname]] < 
+        tss + dwn_str]
+    if (length(probe_idx) == 0) {
+        warning(paste0("No probes for gene ", gene[[4]], "(", 
+            gene[[5]], ")."))
+        return(NULL)
+    }
+    else {
+        return(probe_idx)
+    }
+}
+
 if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
   
   
@@ -403,7 +446,7 @@ build_dmr_candidates = function(pf, pf_chr_colname=1, pf_pos_colname=2, extend_r
     chr = feat[[1]]
     len = as.numeric(feat[[5]])
     meth_platform = chrs_indexed_methpf[[chr]]
-    ret = dmprocr::get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
+    ret = dmprocr_get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
     # meth_platform[ret,1:3]
     # feat
     return(ret)
@@ -633,7 +676,7 @@ if (!exists("mbuild_dmr_candidates")) {mbuild_dmr_candidates = memoise::memoise(
 #     chr = feat[[1]]
 #     len = as.numeric(feat[[5]])
 #     meth_platform = chrs_indexed_methpf[[chr]]
-#     ret = dmprocr::get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
+#     ret = dmprocr_get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
 #     # meth_platform[ret,1:3]
 #     # feat
 #     return(ret)
