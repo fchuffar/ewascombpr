@@ -1,0 +1,322 @@
+---
+title: "Descriptive Statistics"
+author: "Fabien Jossaud, Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+start_time = Sys.time()
+source("common.R")
+```
+
+```{r params}
+source("params_default.R")
+```
+
+
+```{r loading_data}
+if (gse != "dnamaging") {
+  s_filename = paste0("./datashare/", gse, "/study_", gse, ".rds")
+  s = mreadRDS(s_filename)
+} else {
+  s = dnamaging::s_dnamaging  
+}
+
+covariates = intersect(c("tobacco", "disease", "gender"), colnames(s$exp_grp))
+```
+
+
+```{r building_indexes}
+idx_samples = rownames(s$exp_grp)
+idx_clinicals = colnames(s$exp_grp)
+idx_cpg = rownames(s$data)
+n = nrow(s$exp_grp)
+```
+
+# Explained variable
+
+```{r}
+if (y_key %in% colnames(s$exp_grp)) {
+  layout(1, respect=TRUE)
+  hist(s$exp_grp[[y_key]], prob=TRUE, xlab=y_key, main=paste0(y_key, " distribution (", nrow(s$exp_grp), " obs.)")) 
+  lines(density(s$exp_grp[[y_key]], na.rm=TRUE))
+}
+```
+
+
+# Covariates
+
+```{r, fig.height=4.5}
+for (cov in covariates) {
+  layout(matrix(1:2,1), respect=TRUE)
+  tmp_tab = table(s$exp_grp[[cov]], useNA="ifany")
+  # tmp_col = 1:dim(tmp_tab)
+  tmp_col = RColorBrewer::brewer.pal(n=max(3,dim(tmp_tab)), name = "Set1")
+  tmp_x = barplot(tmp_tab, col=tmp_col, ylim=c(0,max(tmp_tab)*1.2), main=cov, las=2)
+  text(tmp_x, tmp_tab+max(tmp_tab)*.1, labels=tmp_tab)
+
+  if (y_key %in% colnames(s$exp_grp)) {
+    f = paste0(y_key,"~",cov)
+    beanplot::beanplot(formula(f), data=s$exp_grp, border=tmp_col, col=adjustcolor(c(1,1,1,1), alpha.f=.1), method="jitter", log="", ylab=y_key, xlab="", las=2, main=f)
+    boxplot(formula(f), data=s$exp_grp, col=adjustcolor(tmp_col, alpha.f=.5), ylab=y_key, xlab="", las=2, main=f)
+    beeswarm::beeswarm(formula(f), data=s$exp_grp, ylab=y_key, xlab="", col=tmp_col, las=2, main=f)  
+  }
+}
+```
+
+
+# Missing values
+
+**TODO**, adding description, what appends there?
+
+```{r missing values, results="verbatim"}
+if (sum(is.na(s$data[idx_cpg,]))>0) {
+  # Removing probes / samples with more than 5% missing values
+  # apply_func = epimedtools::monitored_apply
+  if (! exists("apply_func")) {apply_func = apply}
+  # How many probes are all NA?
+  prop_na_probes =  apply_func(is.na(s$data[idx_cpg, idx_samples]), 1, sum) / length(idx_samples)
+  sum(prop_na_probes>=1)
+  length(idx_cpg)
+  idx_cpg = names(prop_na_probes)[prop_na_probes<1]
+  length(idx_cpg)
+  print(paste0("#probes removed (all NA): ", sum(prop_na_probes==1)))
+
+  prop_na_samples =  apply_func(is.na(s$data[idx_cpg, idx_samples]), 2, sum) / length(idx_cpg)
+  sum(prop_na_samples<.05)
+  length(idx_samples)
+  idx_samples = names(prop_na_samples)[prop_na_samples<.05]
+  length(idx_samples)
+  prop_na_probes =  apply_func(is.na(s$data[idx_cpg, idx_samples]), 1, sum) / length(idx_samples)
+  sum(prop_na_probes>=.05)
+  length(idx_cpg)
+  idx_cpg = names(prop_na_probes)[prop_na_probes<.05]
+  length(idx_cpg)
+
+  print(paste0("#samples removed: ", sum(prop_na_samples>=.05)))
+  print(paste0("#probes removed: ", sum(prop_na_probes>=.05)))
+
+  s$exp_grp = s$exp_grp[idx_samples,]
+  s$data = s$data[idx_cpg,idx_samples]
+  s$platform = s$platform[idx_cpg,]
+  
+
+  if (as.numeric(length(idx_cpg))*as.numeric(nrow(s$exp_grp)) > .Machine$integer.max) {
+    # stop("Machine$integer.max problem")
+    sds = apply(s$data[idx_cpg,], 1, sd, na.rm=TRUE)
+    sds_tresh = sort(sds, decreasing=TRUE)[floor(.Machine$integer.max / nrow(s$exp_grp))]
+    plot(density(sds))
+    abline(v=sds_tresh)
+    tmp_idx = idx_cpg[sds > sds_tresh]
+    length(tmp_idx)
+    idx_cpg = tmp_idx
+  }
+
+  ## KNN - We use the function impute.knn of the package impute to replace remaining missing values with KNN method. 
+  dknnf = impute::impute.knn(s$data[idx_cpg,], k=10, maxp=5000, rng.seed=1)
+  dknn = dknnf$data
+  head(dknn[,1:6])
+  s$data = dknn[idx_cpg,idx_samples]
+} else {
+  print("# No NA.") 
+}
+```
+
+# sd distribution before filtering
+
+
+```{r filter_sd1, fig.height=4.5}
+print("Filtering probes according to sd")
+d = as.matrix(s$data[idx_cpg,])
+sd_thresh = 0.05
+sds = apply(d, 1, sd)
+sum(is.na(sds))
+sds = sds[!is.na(sds)]
+
+idx_probes_sd = names(sds)[sds > sd_thresh]
+length(idx_probes_sd)
+length(sds)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot(density(sds), main=paste("sd distribution"))
+abline(v=sd_thresh)
+plot(density(d                ), main=paste("Methtylation distribution"), lty=2)
+den = density(d[idx_probes_sd,])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=2, lty=1)
+den = density(d[setdiff(rownames(d),idx_probes_sd),])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=4, lty=1)
+legend("topright", c("all", paste0("sd>", sd_thresh), paste0("sd<=", sd_thresh)), col=c(1,2,4), lty=c(2,1,1))
+```
+
+
+# Outliers (PCA)
+
+**TODO**, adding description, what appends there?
+
+```{r acp, results="verbatim"}
+padj = 0
+covariate = covariates[1]
+s$exp_grp[,covariate] = as.factor(s$exp_grp[,covariate])
+levls = levels(s$exp_grp[,covariate])
+it=1
+while(sum(padj < 0.2) != 0) {
+  print(paste0("******* iteration #", it, "..."))
+  it = it+1
+  mat = t(as.matrix(s$data[idx_cpg, idx_samples]))
+  pca = prcomp(mat, scale=FALSE)
+  v = pca$sdev * pca$sdev
+  p = v / sum(v) * 100
+  layout(matrix(1:6,2), respect=TRUE)
+  # layout(matrix(1:2,1), respect=TRUE)
+  barplot(p, ylab="% of variance explained", xlab="components")
+  for (i in 1:5) {
+    j = i+1
+    plot(pca$x[,i], pca$x[,j], 
+    	xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), 
+    	ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+    	col=as.numeric(s$exp_grp[idx_samples,covariate]),
+    	pch=16)  
+    legend(x="topright", legend=levls, col=1:length(levls), lty = 1, title=covariate)
+    # scale_factor = min(abs(c(min(c(pca$x[,i], pca$x[,j])), max(c(pca$x[,i], pca$x[,j])))))
+    # scale_factor = min(abs(c(max(min(pca$x[,i]), min(pca$x[,j])), min(max(pca$x[,i]), max(pca$x[,j])))))
+    # arrows(0,0,pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, col="grey")
+    # text(pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, rownames(pca$rotation))
+  }
+  print(paste0("  removing..."))
+  head(pca$x[,1:2])
+  mean = mean(pca$x[,1])
+  sd = sd(pca$x[,1])
+  pval = pnorm(abs(pca$x[,1]), mean, sd, lower.tail=FALSE)
+  padj = p.adjust(pval, method="BH")
+  sum(padj <= 0.2)
+  range(padj)  
+  idx_samples = names(padj)[padj > 0.2]
+  print(paste0("  #sample removed: ", nrow(s$exp_grp) - length(idx_samples)))
+  s$exp_grp = s$exp_grp[idx_samples,]
+  s$data = s$data[idx_cpg,idx_samples]
+}
+print(paste0("end of iterations."))
+```
+
+
+
+
+
+
+
+# sd distribution after filtering
+
+
+ 
+
+```{r filter_sd2, fig.height=4.5}
+print("Filtering probes according to sd")
+d = as.matrix(s$data[idx_cpg,])
+sd_thresh = 0.05
+sds = apply(d, 1, sd)
+sum(is.na(sds))
+sds = sds[!is.na(sds)]
+# plot(density(sds))
+# abline(v=sd_thresh)
+
+
+idx_probes_sd = names(sds)[sds > sd_thresh]
+# idx_probes_sd
+length(idx_probes_sd)
+length(sds)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot(density(sds), main=paste("sd distribution"))
+abline(v=sd_thresh)
+plot(density(d                ), main=paste("Methtylation distribution"), lty=2)
+den = density(d[idx_probes_sd,])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=2, lty=1)
+den = density(d[setdiff(rownames(d),idx_probes_sd),])
+lines(den$x, den$n / (nrow(d)*ncol(d)) * den$y, col=4, lty=1)
+legend("topright", c("all", paste0("sd>", sd_thresh), paste0("sd<=", sd_thresh)), col=c(1,2,4), lty=c(2,1,1))
+```
+
+# Save
+
+```{r save, results="verbatim"}
+s_filename = paste0("./datashare/", gse, "/study_preproc_", gse, ".rds")
+print(paste0("Writing ", s_filename, "..."))
+s_new = epimedtools::create_study()
+s_new$data     = s$data    
+s_new$exp_grp  = s$exp_grp 
+s_new$platform = s$platform
+s_new$save(s_filename)
+
+dim(s$data)
+dim(s$exp_grp)
+dim(s$platform)
+df = cbind(s$exp_grp, t(s$data[,rownames(s$exp_grp)]))
+
+df_filename = paste0("./datashare/", gse, "/df_preproc_", gse, ".rds")
+print(paste0("Writing ", df_filename, "..."))
+saveRDS(df, df_filename)
+dim(df)
+
+log_filename = paste0("./datashare/", gse, "/info_preproc_", gse, ".log")
+cat(s_filename        , file=log_filename, sep="\n", append=FALSE)
+cat(" and "           , file=log_filename, sep="\n", append=TRUE)
+cat(df_filename       , file=log_filename, sep="\n", append=TRUE)
+cat(" built from:\n"  , file=log_filename, sep="\n", append=TRUE)
+cat(getwd()           , file=log_filename, sep="\n", append=TRUE)
+```
+
+
+
+```{r}
+######## Metadata ##############
+all_cofactors = c("disease","gender","tobacco")
+distrib = list()
+for (cov in covariates) {
+  tmp_distrib = table(s$exp_grp[,cov], useNA="always")
+  names(tmp_distrib)[length(tmp_distrib)] = "NA"  
+  distrib[[length(distrib)+1]] = tmp_distrib
+}
+names(distrib) = covariates
+
+cofactors_distrib = c()
+for (i in all_cofactors){
+	if(i %in% covariates){
+		tab = distrib[[i]]
+		cofactors_distrib = c(cofactors_distrib, paste0(stringr::str_c(names(tab),tab,sep="="),collapse=" / "))
+	} else { cofactors_distrib = c(cofactors_distrib,paste0("No ",i," distribution in this GSE")) }
+}
+names(cofactors_distrib) = all_cofactors
+```
+
+# Process Information 
+
+```{r}
+stop_time = Sys.time()
+info = list(
+  exec_time = round(difftime(stop_time, start_time, units="mins"),1),
+	n = n,
+	n_preproc = nrow(s$exp_grp),
+	cofactors = paste0(covariates,collapse="/")
+)
+
+saveRDS(info, paste0("info_desc_",gse,".rds"))
+```
+
+```{r echo=TRUE, results="verbatim"}
+info
+```
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+

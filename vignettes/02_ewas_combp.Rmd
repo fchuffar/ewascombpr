@@ -1,7 +1,7 @@
 ---
 title: "Methylome analysis"
 subtitle: "Method 2: EWAS + comb-p"
-author: "Florent Chuffart"
+author: "Florent Chuffart, Ekaterina Flin"
 date: "`r Sys.Date()`"
 output: 
   rmarkdown::html_document:
@@ -44,9 +44,18 @@ prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
 prefix2 = paste0(prefix, "_", pval_thresh)
 ```
 
+# Objective
+
+The main objective of this study is to explore the difference in methylation between two groups of breast cancer: GEC+ versus GEC-. We aim to identify the differentially methylated sites, the differentially methylated regions (DMR) as well as the corresponding genes.
+
+
 # Data
 
-targetted study is: `r study_filename`
+We use the methylation data provided by the TCGA public repository.
+
+Dataset: `r study_filename`
+
+Technology: (Illumina?) bead chip containing (how many?) methylation sites with annotations.
 
 ```{r data, results="verbatim"}
 print(paste0("Loading ", study_filename, "..."))
@@ -93,13 +102,19 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 }
 ```
 
-# Model 
+# Method 
 
-`r model_formula`
+The analysis of methylation is performed in two main steps. 
+
+First, we realized the epigenome-wide association study (EWAS) to identify the differentially methylated individual sites. This method aims to calculate a linear regression model between the selected parameters `r model_formula`, and to obtain the corresponding p-values. The distribution of the p-values is then compared to the uniform distribution.
+
+In the second step, using the comp-p software (Pedersen et al. 2012, PMID: 22954632), we explored the spatial distribution of the differentially methylated sites along the genome.  In particular, the comb-p method allows us to identify the regions of enrichment (i.e. series of adjacent low p-values) and to assign significance to those regions. As the result, the differentially methylated regions (DMR) were calculated. Using the information available on the bead chip, these regions can be annotated by the type of region (promoter region TSS-1Kb, enlarged promoter region from 1 to 5 Kb, 5UTR, exon, intron) and assigned to the corresponding genes.  
 
 
 
-# EWAS
+# Results
+
+## Identification of differentially methylated sites using EWAS
 
 
 `r model_formula`
@@ -184,7 +199,7 @@ EWAS results is exporetd as:
 [`r bed_ewas_filename`](./`r bed_ewas_filename`)
 
 
-# Comb-p
+## Identification of differentially methylated regions (DMR) using comb-p
 
 
 ```{r combp}
@@ -386,22 +401,6 @@ WriteXLS::WriteXLS(results, results_filename, FreezeCol=6, FreezeRow=1, BoldHead
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Results
 
 `r study_filename`
 

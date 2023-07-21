@@ -347,11 +347,13 @@ plot_res = function(
       par(mar=c(5.1, 2.1, 0, 0))
       par(mar=c(0, 4.1, 4.1, 0))
       x = 1:length(-log10(pval_ewas))
+      ylim=c(0, min(max(-log10(pval_slk), -log10(pval_ewas)), 100))
+      print(ylim)
       plot(x, -log10(pval_ewas), col="red", xaxt="n",
         xlab="", ylab="-log10(pv)",
         # yaxt="n",
         # main=paste0("meth~", gene),
-        ylim=c(0, max(-log10(pval_slk), -log10(pval_ewas))),
+        ylim=ylim,
         type="l", lty=3
       )
       # axis(4)
