@@ -1,6 +1,6 @@
 ---
 title: "Methylome analysis"
-subtitle: "Method 2: EWAS + comb-p"
+subtitle: "EWAS + comb-p"
 author: "Florent Chuffart, Ekaterina Flin"
 date: "`r Sys.Date()`"
 output: 
@@ -17,6 +17,19 @@ output:
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
 ```
 
+```{r launcher, eval=FALSE}
+{
+  gse = "TCGA-BRCA" ; rmarkdown::render("01_build_study_generic.Rmd") ; 
+  gse = "TCGA-BRCA" ; rmarkdown::render("02_stat_preproc.Rmd")
+  study_filename='study_preproc_TCGA-BRCA.rds';
+  model_func_name = 'modelcalllm' ;
+  for (model_formula in c('meth~gec', 'meth~dnmt3b_median')) {
+    for (pval_thresh in c('1e-30', '1e-20','1e-10','1e-5') ) {
+      rmarkdown::render('02_ewas_combp.Rmd', output_file=paste0('02_ewas_combp_', study_filename, '_', model_func_name, '_', model_formula, '_', pval_thresh, '.html'))
+    }
+  }
+}
+```
 
 ```{r params}
 # # source("common.R") ; study_filename="study_smoke3p_meth_raw.rds";pheno_key="model09"; confounder="time" ; model_func_name="model_call_smoke3p"      ;pval_thresh = 1e-4; source(knitr::purl("04_ewas_combp.Rmd")); model_formula= "meth~jactrlcsc+time", rmarkdown::render("04_ewas_combp.Rmd", output_file=paste0("04_ewas_combp_", pheno_key, "_", study_filename, ".html"))
@@ -44,22 +57,22 @@ prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
 prefix2 = paste0(prefix, "_", pval_thresh)
 ```
 
+
+```{r}
+print(paste0("Loading ", study_filename, "..."))
+s = mreadRDS(study_filename)
+```
 # Objective
 
-The main objective of this study is to explore the difference in methylation between two groups of breast cancer: GEC+ versus GEC-. We aim to identify the differentially methylated sites, the differentially methylated regions (DMR) as well as the corresponding genes.
 
+
+The main objective of this study is to explore the differential methylation profile of samples of the study `r study_filename` caracterised by the cofactor `r cofact = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2]; print(cofact)` taking is values in `r levels(s$exp_grp[,cofact])`. We aim to identify the differentially methylated probes (DMP) as well as differentially methylated regions. The region identified are annotated according to their relative position with respect to the genes to which they are close.
 
 # Data
 
-We use the methylation data provided by the TCGA public repository.
-
-Dataset: `r study_filename`
-
-Technology: (Illumina?) bead chip containing (how many?) methylation sites with annotations.
+We use the methylation data serialized in the file `r study_filename`, containing `r nrow(s$exp_grp)` samples caracterized by their Illumina bead chip methylome (`r nrow(s$platform)` methylation sites with annotations).
 
 ```{r data, results="verbatim"}
-print(paste0("Loading ", study_filename, "..."))
-s = mreadRDS(study_filename)
 if (FILTER_SEXUAL_CHR) {
   dim(s$data)
   s$platform = s$platform[!s$platform[,1]%in%c("chrX","chrY"),]
@@ -204,6 +217,7 @@ EWAS results is exporetd as:
 
 ```{r combp}
 # Run comb-p, run!!
+Sys.setenv(PYTHONPATH = "/summer/epistorage/opt/combined-pvalues/")
 cmd = "/summer/epistorage/opt/combined-pvalues/cpv/comb-p"
 arg = paste0("pipeline -c 5 --seed ", pval_thresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
 print(paste(cmd, arg))
