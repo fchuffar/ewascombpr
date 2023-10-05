@@ -31,21 +31,28 @@ This vignette
 
 methylation study for `r gse`.
 
-```{r, echo=FALSE, eval=TRUE}
+```{r data}
 # Build
 print(paste0("#####", gse))
 s_tmp = epimedtools::create_study()
 s_tmp$gse = gse
 foo = s_tmp$get_data(dest_dir="~/projects/datashare")
 dim(foo)
+
 s = epimedtools::create_study()
 # data
 s$data = foo
 dim(s$data)
+```
+
+```{r exp_grp}
 # exp_grp from epimed_DB
 url = paste0("http://epimed.univ-grenoble-alpes.fr/database/parameters/",gse)
 df1 = read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE, dec=".", na.strings="", row.names=1)
 s$exp_grp = df1
+```
+
+```{r platform}
 if (s_tmp$platform_name=="GPL8490") {
   print("27k")
   library(IlluminaHumanMethylation27kanno.ilmn12.hg19)
@@ -66,6 +73,9 @@ if (s_tmp$platform_name=="GPL8490") {
   stop(paste0("platform problem ", gse))
 }
 
+```
+
+```{r check}
 # Check
 dim(s$data)
 dim(s$exp_grp)
@@ -91,8 +101,10 @@ for (cov in covariates) {
     s$exp_grp[[cov]] = as.factor(s$exp_grp[[cov]])
   }
 }
+```
 
-```{r results="verbatim"}
+
+```{r save, results="verbatim"}
 # Save
 s_filename = paste0("study_", gse, ".rds")
 print(paste0("Writing ", s_filename, "..."))

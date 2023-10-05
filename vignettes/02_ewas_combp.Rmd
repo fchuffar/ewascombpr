@@ -51,9 +51,16 @@ targetted study is: `r study_filename`
 ```{r data, results="verbatim"}
 print(paste0("Loading ", study_filename, "..."))
 s = mreadRDS(study_filename)
+if (FILTER_SEXUAL_CHR) {
+  dim(s$data)
+  s$platform = s$platform[!s$platform[,1]%in%c("chrX","chrY"),]
+  s$data = s$data[rownames(s$platform),]  
+  dim(s$data)
+} 
 d = s$data
 e = s$exp_grp
 pf = s$platform
+
 
 pf_orig = pf
 pf_chr_colname = colnames(pf_orig)[1]
