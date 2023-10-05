@@ -1,0 +1,304 @@
+---
+title: "Build Illumina methylation study"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+start_time = Sys.time()
+```
+
+```{r params}
+# source ~/conda_config_R3.6.1.sh 
+# gse = "GSE20067" ; rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".html"))
+# gse = "GSE20067"; rmarkdown::render('00_fullpipeline1.Rmd', output_file=paste0("00_fullpipeline1_", gse, ".html"))
+# gse = "GSE87571" ; rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".html"))
+# gse = "GSE87571"; nb_core=12; rmarkdown::render('00_fullpipeline1.Rmd', output_file=paste0("00_fullpipeline1_", gse, ".html"))
+# gse = "GSE136296" ; rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".html"))
+# gse = "GSE136296"; rmarkdown::render('00_fullpipeline1.Rmd', output_file=paste0("00_fullpipeline1_", gse, ".html"))
+
+# gse = "GSE147740" ; rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".html"))
+# gse = "GSE147740"; nb_core=12; rmarkdown::render('00_fullpipeline1.Rmd', output_file=paste0("00_fullpipeline1_", gse, ".html"))
+
+#
+# gse = "GSE42861" ; rmarkdown::render("01_build_study_generic.Rmd", output_file=paste0("01_build_study_", gse, ".html"))
+# seed=1 ; gse = "GSE42861"; nb_core=12; rmarkdown::render('00_fullpipeline1.Rmd', output_file=paste0("00_fullpipeline1_", gse, ".html"))
+```
+
+
+# Purpose
+
+This vignette 
+
+- build data and exp_grp
+- decorate data
+- build exp_grp from EpiMedDB
+- build platform
+- decorate exp_grp
+- check
+- visualize
+- save 
+
+methylation study for `r gse`.
+
+```{r build data}
+# Build
+print(paste0("#####", gse))
+s = epimedtools::create_study()
+s$gse = gse
+
+# get exp_grp df from NCBI/GEO
+dim(s$exp_grp)
+if (substr(gse,1,3)=="GSE") {
+  tmp_exp_grp = s$get_exp_grp(dest_dir="./datashare")
+  dim(tmp_exp_grp)  
+}
+
+# get data matrix from NCBI/GEO
+dim(s$data)
+if (substr(gse,1,3)=="GSE") {
+tmp_data = s$get_data(dest_dir="./datashare")
+dim(tmp_data)
+# data orig
+s$stuffs$orig = "series_matrix"
+} else {
+  tmp_data = matrix(nrow=0, ncol=0)
+}
+```
+
+```{r build exp_grp from EpiMedDB, eval=FALSE}
+# get exp_grp from epimed_DB http://epimed.univ-grenoble-alpes.fr/database/series
+url = paste0("http://epimed.univ-grenoble-alpes.fr/database/parameters/",gse)
+df1 = try(read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE, dec=".", na.strings="", row.names=1))
+# url = paste0("http://epimed.univ-grenoble-alpes.fr/database/expgroup/",gse)
+# df2 = read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE, dec=".", na.strings="", row.names=1)
+# head(df2)
+if (attributes(df1)$class == "try-error") {
+  # Do nothing, exp_grp (columns metadata) is obtained from NCBI/GEO
+} else {
+  s$exp_grp = df1
+}
+dim(s$exp_grp)
+head(s$exp_grp)
+```
+
+```{r decorate_exp_grp}
+expgrpwrapper_file = paste0("01_expgrpwrapper_", gse, ".R")
+print(expgrpwrapper_file)
+if (exists("DEBUG")) { stop("stop here for debugging")}
+source(expgrpwrapper_file)
+
+for (fact in c("age", "bmi")) {
+  if (fact %in% colnames(s$exp_grp)) {
+    if (!is.numeric(s$exp_grp[[fact]])) {
+      stop(paste0("s$exp_grp$", fact, " must be numeric.")) 
+    }  
+  }
+}
+
+for (fact in c("gender", "tobacco", "disease", "ethnicity")) {
+  if (fact %in% colnames(s$exp_grp)) {
+    if (!is.factor(s$exp_grp[[fact]])) {
+      stop(paste0("s$exp_grp$", fact, " must be factor")) 
+    }  
+  }
+}
+head(s$exp_grp)
+```
+
+
+
+```{r decorate data}
+gseidat_study_filename = paste0("./datashare/", gse, "/study_idat_", gse, ".rds")
+if (file.exists(gseidat_study_filename)) {
+  study_gseidat = readRDS(gseidat_study_filename)
+  s$data = study_gseidat$data
+  s$exp_grp = s$exp_grp[intersect(rownames(s$exp_grp), colnames(s$data)),]   
+  s$stuffs$orig = "idat"
+  tmp_data = s$data
+}
+
+# get data matrix from wrapper
+if (nrow(tmp_data)==0) {
+  datawrapper_file = paste0("01_datawrapper_", gse, ".R")
+  print(datawrapper_file)
+  source(datawrapper_file)    
+  s$stuffs$orig = "datawrapper"
+}
+
+if (nrow(s$data)==0) {
+  stop(paste0("could not directly load beta matrix from GEO API for ", gse, ". Need to customize by creating ", datawrapper_file, " script."))  
+} 
+s$data = s$data[,rownames(s$exp_grp)] 
+dim(s$data)
+```
+
+
+```{r platform}
+print("# get platform (rows metdata) from IlluminaHumanMethylationXXXanno")
+if (s$platform_name=="GPL8490") {
+  print("27k")
+  library(IlluminaHumanMethylation27kanno.ilmn12.hg19)
+  pf27k = data.frame(getAnnotation(IlluminaHumanMethylation27kanno.ilmn12.hg19))
+  s$platform = pf27k
+} else if (s$platform_name=="GPL13534") { 
+  print("450k")
+  library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+  pf450k = data.frame(getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19))
+  s$platform = pf450k  
+} else if (s$platform_name%in%c("GPL21145", "GPL23976")) {
+  print("epic")
+  library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)  
+  pfepic = data.frame(getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19))
+  s$platform = pfepic  
+} else {
+  stop(paste0("platform problem ", gse, " ", s$platform_name))
+}
+s$platform = s$platform[rownames(s$platform) %in% rownames(s$data),]
+
+# A. cell composition
+if (!s$platform_name=="GPL8490") {
+  library(EpiDISH)
+  betaData.m = s$data
+  dim(s$data)
+  BloodFrac.m <- epidish(betaData.m, ref.m = centDHSbloodDMC.m, method = "RPC")$estF
+  head(BloodFrac.m)
+  dim(BloodFrac.m)
+  s$exp_grp = cbind(s$exp_grp, BloodFrac.m[rownames(s$exp_grp),])
+  head(s$exp_grp)
+}
+
+# # B. remove probes on chrX and chrY
+# head(s$platform[,1:6])
+# table(s$platform[,1])
+# s$platform = s$platform[!s$platform[,1] %in% c("chrX", "chrY"),]
+# table(s$platform[,1])
+# s$data = s$data[rownames(s$platform),]
+
+# C. clean data
+s$data = s$data[rownames(s$platform),rownames(s$exp_grp)] 
+```
+
+
+
+
+
+
+
+```{r check}
+# Check
+dim(s$data)
+dim(s$exp_grp)
+# s$data = s$data[,!colnames(s$data)%in%sample_blacklist]
+# s$exp_grp = s$exp_grp[!rownames(s$exp_grp)%in%sample_blacklist,]
+dim(s$data)
+dim(s$exp_grp)
+if (sum(!rownames(s$exp_grp) %in% colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
+s$exp_grp = s$exp_grp[colnames(s$data),]
+if (sum(rownames(s$exp_grp) != colnames(s$data)) !=0 ) {stop(paste0("problem exp_grp names ", gse))}
+
+dim(s$platform)
+dim(s$data)
+if (sum(!rownames(s$data) %in% rownames(s$platform)) !=0 ) {warning(paste0("problem pf names ", gse))}
+s$platform = s$platform[intersect(rownames(s$data), rownames(s$platform)),]
+s$data = s$data[rownames(s$platform),]
+if (sum(rownames(s$data) != rownames(s$platform)) !=0 ) {stop(paste0("problem pf names ", gse))}
+```
+
+
+# Visualize  
+
+```{r, echo=TRUE, results="verbatim"}
+dim(s$data)
+dim(s$exp_grp)
+dim(s$platform)
+sum(is.na(s$data))
+table(s$platform[,1])
+```
+
+```{r visualize, }
+# layout(matrix(1:2, 1), respect=TRUE)
+if (as.numeric(nrow(s$data))*as.numeric(ncol(s$data)) < .Machine$integer.max) {
+  layout(1, respect=TRUE)
+  plot(density(s$data, na.rm=TRUE), main=paste0(gse, " beta value dist."))  
+}
+```
+
+```{r, echo=TRUE, results="verbatim"}
+for (exp_grp_key in colnames(s$exp_grp)) {
+  print(paste0("*** ", exp_grp_key, " ***"))
+  x = s$exp_grp[,exp_grp_key]
+  if (length(unique(x)) != length(x)) {
+    print(table(x, useNA="always"))      
+  } else {
+    print("Not printed.")          
+  }
+}
+```  
+
+
+
+
+# Save
+
+```{r save, results="verbatim"}
+s_filename = paste0("./datashare/", gse, "/study_", gse, ".rds")
+print(paste0("Writing ", s_filename, "..."))
+s$save(s_filename)
+dim(s$data)
+dim(s$exp_grp)
+dim(s$platform)
+
+df = cbind(s$exp_grp, t(s$data[,rownames(s$exp_grp)]))
+df_filename = paste0("./datashare/", gse, "/df_", gse, ".rds")
+print(paste0("Writing ", df_filename, "..."))
+saveRDS(df, df_filename)
+dim(df)
+
+log_filename = paste0("./datashare/", gse, "/info_", gse, ".log")
+cat(s_filename        , file=log_filename, sep="\n", append=FALSE)
+cat(" and "           , file=log_filename, sep="\n", append=TRUE)
+cat(df_filename       , file=log_filename, sep="\n", append=TRUE)
+cat(" built from:\n"  , file=log_filename, sep="\n", append=TRUE)
+cat(getwd()           , file=log_filename, sep="\n", append=TRUE)
+```
+
+# Process Information 
+
+
+```{r}
+stop_time = Sys.time()
+info = list(
+  exec_time = round(difftime(stop_time, start_time, units="mins"),1),
+  GPL  = s$platform_name,
+  orig = s$stuffs$orig,
+  n    = ncol(s$data),
+  p    = nrow(s$data),
+  age     = ifelse("age"     %in% colnames(s$exp_grp), paste0(round(quantile(s$exp_grp$age, na.rm=TRUE)), collapse=", ")                                                            , NA),
+  gender  = ifelse("gender"  %in% colnames(s$exp_grp), paste0(sapply(levels(s$exp_grp$gender           ), function(x) {paste0(x, " (", table(s$exp_grp$gender  , useNA="ifany")[x], ")")}), collapse=" "), NA),
+  tissue  = ifelse("tissue"  %in% colnames(s$exp_grp), paste0(sapply(levels(s$exp_grp$tissue           ), function(x) {paste0(x, " (", table(s$exp_grp$tissue  , useNA="ifany")[x], ")")}), collapse=" "), NA),
+  tobacco = ifelse("tobacco" %in% colnames(s$exp_grp), paste0(sapply(levels(s$exp_grp$tobacco          ), function(x) {paste0(x, " (", table(s$exp_grp$tobacco , useNA="ifany")[x], ")")}), collapse=" "), NA),
+  disease = ifelse("disease" %in% colnames(s$exp_grp), paste0(sapply(levels(s$exp_grp$disease          ), function(x) {paste0(x, " (", table(s$exp_grp$disease , useNA="ifany")[x], ")")}), collapse=" "), NA)
+)
+
+saveRDS(info, paste0("info_build_",gse,".rds"))
+```
+
+```{r echo=TRUE, results="verbatim"}
+info
+```
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
