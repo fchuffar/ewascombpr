@@ -1,7 +1,7 @@
 ---
 title: "Methylome analysis"
-subtitle: "EWAS + comb-p"
-author: "Florent Chuffart, Ekaterina Flin"
+subtitle: "ewas + neighb"
+author: "Florent Chuffart, Ekatarina Flin, Fabien Jossaud"
 date: "`r Sys.Date()`"
 output: 
   rmarkdown::html_document:
@@ -15,58 +15,62 @@ output:
 
 ```{r, echo=FALSE, eval=TRUE}
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
-```
-
-```{r launcher, eval=FALSE}
-{
-  gse = "TCGA-BRCA" ; rmarkdown::render("01_build_study_generic.Rmd") ; 
-  gse = "TCGA-BRCA" ; rmarkdown::render("02_stat_preproc.Rmd")
-  study_filename='study_preproc_TCGA-BRCA.rds';
-  model_func_name = 'modelcalllm' ;
-  for (model_formula in c('meth~gec', 'meth~dnmt3b_median')) {
-    for (pval_thresh in c('1e-30', '1e-20','1e-10','1e-5') ) {
-      rmarkdown::render('02_ewas_combp.Rmd', output_file=paste0('02_ewas_combp_', study_filename, '_', model_func_name, '_', model_formula, '_', pval_thresh, '.html'))
-    }
-  }
-}
-```
-
-```{r params}
-# # source("common.R") ; study_filename="study_smoke3p_meth_raw.rds";pheno_key="model09"; confounder="time" ; model_func_name="model_call_smoke3p"      ;pval_thresh = 1e-4; source(knitr::purl("04_ewas_combp.Rmd")); model_formula= "meth~jactrlcsc+time", rmarkdown::render("04_ewas_combp.Rmd", output_file=paste0("04_ewas_combp_", pheno_key, "_", study_filename, ".html"))
-#
 source("../R/common.R")
 source("config")
 if (file.exists("00_local_config")) {source("00_local_config")}
-
 # source("modelcall.R")
+```
 
-if (!exists("study_filename"))  study_filename = "study_GSE40279.rds"   ;
+
+```{r inputs}
+if (!exists("study_filename"))  study_filename = "study_GSE42861.rds"   ;
+if (!exists("model_formula"))   model_formula = "meth~age"              ;
 if (!exists("model_func_name")) model_func_name = "modelcalllm"         ;
-if (!exists("pval_thresh"))     pval_thresh = 1e-30                     ;
-if (!exists("model_formula"))   model_formula = "meth~age__y_+gender"   ;
+if (!exists("newas"))           newas = 2000                            ;
+if (!exists("neighb"))          neighb = 1000                           ;
 
 if (file.exists(paste0(model_func_name, ".R"))) {
   source(paste0(model_func_name, ".R"))
 }
 ```
 
-
-
-```{r prefix}
-prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
-prefix2 = paste0(prefix, "_", pval_thresh)
+```{r outputs}
+bed_ewas_filename = paste0("ewas4combp_", study_filename, "_", model_func_name, "_", model_formula, ".bed")
+gse = substr(study_filename, 7, nchar(study_filename)-4)
+prefix = paste0(gse, "_", model_func_name, "_", model_formula, "_", newas, "_nn", neighb)
+study_output_filename = paste0("study_", prefix, ".rds")
 ```
 
-
-```{r}
+```{r loading data}
 print(paste0("Loading ", study_filename, "..."))
 s = mreadRDS(study_filename)
 ```
+
 # Objective
 
+The main objective of this vignette is to reduce the number of probes of the study `r study_filename` : 
+
+  - we perform an ewas on the dataset using the model : `r model_formula` (computed by `r model_func_name`).
+  - ewas results are exported as: [`r bed_ewas_filename`](./`r bed_ewas_filename`)
+  - we select `r newas` probes with the lowest p.value (Fisher).
+  - we iteratively add probes that own to the neighborhood of selected probes (+/- `neighb`b).
+  - isolated probes are exported as : [`r study_output_filename`](./`r study_output_filename`)
+  - new study is created as: [`r study_output_filename`](./`r study_output_filename`)
+ 
+model is caracterised by the cofactor `r cofact = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2]; print(cofact)` taking is values in `r levels(s$exp_grp[,cofact])`.
+
+Final goal is to identify the Health Predictor Methylated Probes (HPMP) as well as Health Predictor Methylated Regions (HPMR). 
 
 
-The main objective of this study is to explore the differential methylation profile of samples of the study `r study_filename` caracterised by the cofactor `r cofact = rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2]; print(cofact)` taking is values in `r levels(s$exp_grp[,cofact])`. We aim to identify the differentially methylated probes (DMP) as well as differentially methylated regions. The region identified are annotated according to their relative position with respect to the genes to which they are close.
+# Method 
+
+The analysis of methylation is performed in two main steps. 
+
+First, we realized the epigenome-wide association study (EWAS) to identify the differentially methylated individual sites. This method aims to calculate a linear regression model between the selected parameters `r model_formula`, and to obtain the corresponding p-values. The distribution of the p-values is then compared to the uniform distribution.
+
+In the second step, ...
+
+**TODO**
 
 # Data
 
@@ -103,7 +107,7 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 }
 
 
-layout(matrix(1:6,2), respect=TRUE)
+layout(1, respect=TRUE)
 for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1]) {
   if (is.factor(e[[f]])) {
     table(e[[f]], useNA="ifany")    
@@ -115,19 +119,8 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 }
 ```
 
-# Method 
 
-The analysis of methylation is performed in two main steps. 
-
-First, we realized the epigenome-wide association study (EWAS) to identify the differentially methylated individual sites. This method aims to calculate a linear regression model between the selected parameters `r model_formula`, and to obtain the corresponding p-values. The distribution of the p-values is then compared to the uniform distribution.
-
-In the second step, using the comp-p software (Pedersen et al. 2012, PMID: 22954632), we explored the spatial distribution of the differentially methylated sites along the genome.  In particular, the comb-p method allows us to identify the regions of enrichment (i.e. series of adjacent low p-values) and to assign significance to those regions. As the result, the differentially methylated regions (DMR) were calculated. Using the information available on the bead chip, these regions can be annotated by the type of region (promoter region TSS-1Kb, enlarged promoter region from 1 to 5 Kb, 5UTR, exon, intron) and assigned to the corresponding genes.  
-
-
-
-# Results
-
-## Identification of differentially methylated sites using EWAS
+# Identification of differentially methylated sites using EWAS
 
 
 `r model_formula`
@@ -168,6 +161,46 @@ ewas = ewas[idx_probes,]
 dim(ewas)
 ```
 
+```{r ewas_fabien, eval=FALSE}
+y_key = "age"
+confounders = NULL
+
+if (nbewasprobes>0) {
+  print("filtering EWAS top probes")
+  cpg_matrix = d
+  if (!is.null(confounders)) {
+    design_matrix <- model.matrix(formula(paste0("~", y_key, "+", paste0(confounders, collapse="+"))), e)    
+  } else {
+    design_matrix <- model.matrix(formula(paste0("~", y_key)), e)    
+  }
+  dim(design_matrix)
+  dim(cpg_matrix)
+  fit = mlimma_lmFit(cpg_matrix, design_matrix)
+  fit = limma::eBayes(fit) # compute moderated t-statistics, moderated F-statistic, and log-odds of differential expression by empirical Bayes moderation of the standard errors towards a global value
+  # head(fit$p.value)
+  idx_cpg_oi = rownames(fit$p.value)[rank(fit$p.value[,2]) <= nbewasprobes]
+  layout(1, respect=TRUE)
+  plot(fit$coefficients[,2], -log10(fit$p.value[,2]), col=(rownames(fit$p.value) %in% idx_cpg_oi)+1, pch=".", main=paste0(nbewasprobes, " probes"))
+
+  litterature_models = readRDS("litterature_models.rds")  
+  idx_cpg_litt = unique(unlist(lapply(lapply(litterature_models, "[[", "coeff"), "[[", "probes")))  
+
+  idx_cpg = intersect(idx_cpg, c(idx_cpg_oi, idx_cpg_litt))
+
+  dim(df)
+  df_ewas = df[,c(idx_clinicals, idx_cpg)]
+  dim(df_ewas)
+
+
+  # df_dnamaging = df
+  # colnames(df_dnamaging)[2] = "age"
+  # head(df_dnamaging[,1:20])
+  # save(df_dnamaging, file='./dnamaging/data/df_dnamaging.RData' , compress='xz')
+} else {
+  # Nothing to do for idx_cpg
+}
+```
+
 
 
 
@@ -181,6 +214,7 @@ plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
 plot(density(ewas[,"lpv"]), main="lpv distribution", pch=".", xlim=c(0,100))
 plot(density(10^-ewas[,"lpv"]), main="pv distribution", pch=".", xlim=c(0,1))
 plot(sort(-log10(runif(nrow(ewas)))) , sort(ewas[,"lpv"]), main="million dollar plot", pch=".")
+abline(a=0,b=1, lty=2, col="grey")
 ```
 
 ```{r build_bed}
@@ -197,11 +231,10 @@ bed[,3] = bed[,2]+1
 bed$probes = names(pval)
 bed$pval = pval
 bed$strand = "+"
-colnames(bed) = c("chrom", "start", "end", "probes", "pval", "strand")
+colnames(bed) = c("#chrom", "start", "end", "probes", "pval", "strand")
 head(bed)
 
 # write ewas res for combp
-bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
 bed[,1] = as.character(bed[,1])
 bed = bed[order(bed[,1], bed[,2]),]
 write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
@@ -212,43 +245,178 @@ EWAS results is exporetd as:
 [`r bed_ewas_filename`](./`r bed_ewas_filename`)
 
 
-## Identification of differentially methylated regions (DMR) using comb-p
+# Selection of probes with the lowest Fisher p.value
 
 
-```{r combp}
-# Run comb-p, run!!
-Sys.setenv(PYTHONPATH = "/summer/epistorage/opt/combined-pvalues/")
-cmd = "/summer/epistorage/opt/combined-pvalues/cpv/comb-p"
-arg = paste0("pipeline -c 5 --seed ", pval_thresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
-print(paste(cmd, arg))
-system2(cmd, arg)
-```
+```{r newas}
+# bed_on_disk = read.table(bed_ewas_filename, sep="\t", header=TRUE)
+# head(bed_on_disk)
+dim(bed)
+head(bed[order(bed$pval),])
+tail(bed[order(bed$pval),])
+idx_cpg_newas = rownames(bed[order(bed$pval),])[1:newas]
 
-```{r echo=FALSE, out.width="100%", results="asis"}
-manhattan_file = paste0("dmr_", prefix2, ".manhattan.png")
-if (file.exists(manhattan_file)) {
-  cat(paste0("![](", manhattan_file, ")"), "\n")
+
+# HERE ALGO NN
+if (FALSE) {
+  platform = bed
+  platform = platform[order(platform$chr,platform$pos),]
+  platform$pos_prev_nn = c(NA,platform$start[-length(platform$start)])
+  platform$pos_next_nn =  c(platform$start[-1],NA)
+  platform$dist_prev_nn = platform$start - platform$pos_prev_nn
+  platform$dist_next_nn = platform$pos_next_nn - platform$start
+  platform[is.na(platform$dist_prev_nn) | platform$dist_prev_nn < 0,]$dist_prev_nn = 2*neighb
+  platform[is.na(platform$dist_next_nn) | platform$dist_next_nn < 0,]$dist_next_nn = 2*neighb
+  platform$is_kept = FALSE
+  platform[idx_cpg_newas,]$is_kept = TRUE
+  new_count = sum(platform$is_kept)
+  old_count = new_count -1 
+  while(old_count < new_count) {
+    old_count = new_count
+    platform$is_kept = platform$is_kept | (platform$dist_prev_nn <= neighb & c(FALSE,platform$is_kept[-length(platform$is_kept)] %in%TRUE))
+    print(sum(platform$is_kept))
+    platform$is_kept = platform$is_kept | (platform$dist_next_nn <= neighb & c(platform$is_kept[-1],FALSE) %in%TRUE)
+    new_count = sum(platform$is_kept)
+  }
+  idx_cpg_newas_neighb_nn = rownames(platform)[platform$is_kept]  
+  length(idx_cpg_newas_neighb_nn)
+  length(idx_cpg_newas_neighb)
+  sum(idx_cpg_newas_neighb_nn %in% idx_cpg_newas_neighb)
+  sum(idx_cpg_newas_neighb %in% idx_cpg_newas_neighb_nn)
+  head(bed[idx_cpg_newas_neighb[!idx_cpg_newas_neighb %in% idx_cpg_newas_neighb_nn],])
+
+  bed$foo = NA
+  bed$bar = NA
+  bed[idx_cpg_newas_neighb, ]$foo =   idx_cpg_newas_neighb %in% idx_cpg_newas_neighb_nn
+  bed[idx_cpg_newas_neighb, ]$bar =   idx_cpg_newas_neighb %in% idx_cpg_newas
+  head(bed[idx_cpg_newas_neighb, ], 100)
+  
+  fat_feat[fat_feat$chr%in%"chr1",]
+  fat_feat_indexed_probes[["chr1:1549615-1567821"]] %in% idx_cpg_newas
+  fat_feat_indexed_probes[["chr1:1549615-1567821"]][fat_feat_indexed_probes[["chr1:1549615-1567821"]] %in% idx_cpg_newas]
+
+  bed["cg08231710", ]
+  bed[fat_feat_indexed_probes[["chr1:1549615-1567821"]],]
 }
+
+# HERE ALGO FAT_FEAT
+pf = bed
+pf_chr_colname = 1 
+pf_pos_colname = 2
+extend_region_dist = neighb/2 - 1
+
+pf = pf[pf[,pf_pos_colname]>0,]
+pf = pf[order(pf[[pf_chr_colname]],pf[[pf_pos_colname]]), ]
+## index meth probes by chr
+chrs = unique(pf[[pf_chr_colname]])
+chrs_indexed_methpf = lapply(chrs, function(chr) {
+    print(chr)
+    idx = rownames(pf)[!is.na(pf[[pf_chr_colname]]) & pf[[pf_chr_colname]]==chr]
+    ret = pf[idx,]
+    return(ret)
+})
+names(chrs_indexed_methpf) = chrs
+
+fat_feat = lapply(unique(pf[,pf_chr_colname]), function(chr) {
+  d = pf[pf[,pf_chr_colname]==chr,c(pf_chr_colname, pf_pos_colname)]
+  i = intervals::Intervals(c(d[,2], d[,2]+1), type="Z")
+  # enlarge your fat feat
+  l = extend_region_dist
+  c = intervals::close_intervals( intervals::contract( intervals::reduce(intervals::expand(i, l)), l) )
+  dim(c)
+  df = data.frame(chr, c[,1], c[,2])
+  return(df)
+})
+fat_feat = do.call(rbind, fat_feat)
+dim(fat_feat)
+fat_feat[,4] = paste0(fat_feat[,1], ":", fat_feat[,2], "-", fat_feat[,3])
+fat_feat[,5] = fat_feat[,3] - fat_feat[,2]
+fat_feat[,6] = "+"
+# fat_feat = fat_feat[fat_feat[,5]>1,]
+rownames(fat_feat) = fat_feat[,4]
+colnames(fat_feat)  = c("chr", "start", "end", "id", "score", "strand")
+dim(fat_feat)
+head(fat_feat)
+
+## index probes by feat name
+print("# indexing probes by feat name")
+fat_feat_indexed_probes = epimedtools::monitored_apply(fat_feat, 1, function(feat) {
+  # feat = fat_feat[3,]
+  # print(feat)
+  chr = feat[[1]]
+  len = as.numeric(feat[[5]])
+  meth_platform = chrs_indexed_methpf[[chr]]
+  ret = dmprocr_get_probe_names(feat, meth_platform, pf_chr_colname, pf_pos_colname, 0, len)
+  # meth_platform[ret,1:3]
+  # feat
+  return(ret)
+})
+
+fat_feat$n_probes = sapply(fat_feat_indexed_probes, length) 
+fat_feat$z_sidak_p = 1
+
+
+layout(matrix(1:2,1), respect=TRUE)
+barplot(table(cut(fat_feat$score, breaks=c(0, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000, 100000, 200000, 50000000), include.lowest=TRUE)), las=2,main="locus length distribution")
+barplot(table(cut(fat_feat$score[fat_feat$score>1], breaks=c(0, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000, 100000, 200000, 50000000), include.lowest=TRUE)), las=2,main="locus length distribution")
+
+
+idx_fat_feat_oi = sapply(fat_feat_indexed_probes, function(probes) {
+  any(probes %in% idx_cpg_newas)
+})
+fat_feat = fat_feat[names(idx_fat_feat_oi)[idx_fat_feat_oi],]
+fat_feat_indexed_probes = fat_feat_indexed_probes[rownames(fat_feat)]
+idx_cpg_newas_neighb = unlist(unique(fat_feat_indexed_probes))
+length(idx_cpg_newas_neighb)
+
+barplot(table(cut(fat_feat$score, breaks=c(0, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000, 100000, 200000, 50000000), include.lowest=TRUE)), las=2,main="locus length distribution")
+barplot(table(cut(fat_feat$score[fat_feat$score>1], breaks=c(0, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000, 100000, 200000, 50000000), include.lowest=TRUE)), las=2,main="locus length distribution")
+
+plot(sort(-log10(runif(nrow(ewas)))) , sort(ewas[,"lpv"]),                              ylim=c(0, max(ewas[,"lpv"])), main="million dollar plot", pch=".", col=(names(sort(ewas[,"lpv"]))%in%idx_cpg_newas)+1)
+abline(a=0,b=1, lty=2, col="grey")
+legend("topleft", pch=1, col=2, paste0(length(idx_cpg_newas), " lowest pvals"))
+plot(sort(-log10(runif(nrow(ewas)))) , sort(ewas[,"lpv"]),                              ylim=c(0, max(ewas[,"lpv"])), main="million dollar plot", pch=".", col=(names(sort(ewas[,"lpv"]))%in%idx_cpg_newas_neighb)+1)
+abline(a=0,b=1, lty=2, col="grey")
+legend("topleft", pch=1, col=2, paste0(length(idx_cpg_newas_neighb), " probes in ", newas, " lowest\n ewas probes +/-", neighb, " bp"))
+
+# stop("EFN")
+
+s$data = s$data[rownames(s$data)%in%idx_cpg_newas_neighb,]  
+s$platform = s$platform[rownames(s$data),]
+saveRDS(s, study_output_filename)
 ```
+
 
 
 ```{r combp_outputs}
-# recuparation du fichier dmrbycombp1000_SGCE.fdr.bed après comb-p
-ewas = read.table(paste0("ewas4combp_", prefix, ".bed"), header=TRUE)
-combp_res_probes = read.table(gzfile(paste0("dmr_", prefix2, ".fdr.bed.gz")), comment="@", header=TRUE)
-combp_res_region_filename = paste0("dmr_", prefix2, ".regions-t.bed")
-if (file.exists(combp_res_region_filename)) {  
-  combp_res_region = read.table(combp_res_region_filename, comment="@", header=TRUE)
-  # head(combp_res_region[order(-combp_res_region$n_probes, combp_res_region$z_sidak_p),])
-  # reg = combp_res_region[order(-combp_res_region$n_probes, combp_res_region$z_sidak_p),][1,]
-  # probes = ewas[as.character(ewas[,1])==as.character(reg[[1]]) & ewas[,2]>=reg[[2]] & ewas[,2]<=reg[[3]],4]
-} else {
-  combp_res_region = data.frame(n_probes=NA, z_sidak_p=NA)[-1,]
-  combp_res_region
-}
-results = combp_res_region
-results_filename = paste0("tmp_", prefix2, ".bed")
+# # recuparation du fichier dmrbycombp1000_SGCE.fdr.bed après comb-p
+# combp_res_region_filename = paste0("dmr_", prefix, ".regions-t.bed")
+# combp_res_region_filename = "dmr_study_r0_ewas2000_nn1000_GSE42861.rds_modelcalllm_meth~age+gender_1e-30.regions-t.bed"
+# combp_res_region = read.table(combp_res_region_filename, comment="@", header=TRUE)
+#   X.chrom    start      end     min_p n_probes       z_p z_sidak_p
+# 1    chr1  2344979  2345476 0.000e+00       11 4.676e-47 2.025e-45
+# 2    chr1  3567870  3567931 1.230e-31        2 6.901e-18 2.435e-15
+# 3    chr1 17766917 17766996 3.845e-31        2 1.070e-32 2.915e-30
+# 4    chr1 19992504 19992565 0.000e+00        2 3.848e-44 1.358e-41
+# 5    chr1 39491318 39491460 6.332e-31        3 1.852e-32 2.808e-30
+# 6    chr1 47882314 47882740 0.000e+00        4 7.368e-48 3.722e-46
+# combp_res_region = data.frame(n_probes=NA, z_sidak_p=NA)[-1,]
+# results = combp_res_region
+results = fat_feat
+results[,5] = NA
+results[,6] = NA
+names(results)[5:6] = c("n_probes", "z_sidak_p")
+tmp_results_filename = paste0("tmp_", prefix, ".bed")
+results_filename = paste0("global_results_", prefix, ".xlsx")
 ```
+
+
+
+
+
+
+
+# Annotation
 
 
 
@@ -310,8 +478,109 @@ head(results)
 
 
 
+> as.vector(unlist(fat_feat_indexed_probes[rownames(fat_feat[fat_feat$score==1,])]))
+ [1] "cg04080625" "cg17168836" "cg08893087" "cg00653615" "cg13804478"
+ [6] "cg26894354" "cg08128734" "cg26575914" "cg06370069" "cg00533891"
+[11] "cg19873536" "cg12776156" "cg15948836" "cg05655457" "cg12686055"
+[16] "cg21656937" "cg11649376" "cg17183905" "cg23395688" "cg24674215"
+[21] "cg06914505" "cg10577534" "cg06601581" "cg11024682" "cg21692159"
+[26] "cg12533658" "cg26748477" "cg06874016" "cg12350474" "cg13683374"
+[31] "cg21469505" "cg24848615" "cg14950321" "cg25782440" "cg01542019"
+[36] "cg26856607" "cg07197831" "cg10107473" "cg10835286" "cg06682024"
+[41] "cg23482132" "cg20456243" "cg16640358" "cg19753867" "cg03758021"
+[46] "cg17526301" "cg10803722" "cg06171420" "cg07127410" "cg18708252"
+[51] "cg03530962" "cg22354646" "cg04357717" "cg00329615" "cg25425705"
+ [56] "cg16782084" "cg06388350" "cg14069287" "cg13039251" "cg22788465"
+[61] "cg21874213" "cg26403171" "cg09646173" "cg02114954" "cg16431787"
+[66] "cg01882991" "cg17593342" "cg01205011" "cg13001142" "cg22133973"
+[71] "cg17136255" "cg07568841" "cg09124496" "cg25311470" "cg01493685"
+[76] "cg00582628" "cg25998745" "cg04436528" "cg00755588"
+
+```{r features, eval=TRUE}
+# https://zenbu-wiki.gsc.riken.jp/zenbu/wiki/index.php/Uploading_UCSC_repetitive_elements_track
+# downloading UCSC rmsk data as BED
+# BED formatted UCSC track content can be obtained from UCSC table broswer.
+# The rmsk RepeatMasker (rmsk) track can be exported as BED file by selecting
+#
+# the assembly "Feb.2009 GRCh37/hg19"
+# the group "repeats and variations"
+# the track "RepeatMasker"
+# and finally the table "rmsk"
+# As we desire the complete repetitive elements genome-wide to be loaded into ZENBU, therefore we select
+#
+# region: "genome"
+# ZENBU enable gzip compressed bed files to be loaded directly, so we will further select :
+#
+# output format: "BED - browser extensible data"
+# output file: we will name the file "UCSC_rmsk.hg19.bed.gz"
+# file type returned: "gzip compressed"
+
+if (!exists("rmsk_raw")) {
+  rmsk_raw = read.table(gzfile("UCSC_rmsk.hg19.bed.gz"), skip=1, stringsAsFactors=FALSE)
+}
+rmsk = rmsk_raw
+# head(rmsk)
+# dim(rmsk)
+# head(rmsk[,4])
+#
+# foo = rmsk[grep("AATGG|ATGGA|ATTCC|CATTC|GAATG|TCCAT|TGGAA", rmsk[,4]),]
+# bar = rmsk[grep("ALR/Alpha", rmsk[,4]),]
+#
+# foo = rmsk[grep("line", rmsk[,4], ignore.case=TRUE),]
+# table(foo[,4])
+# foo = rmsk[grep("sine", rmsk[,4], ignore.case=TRUE),]
+# table(foo[,4])
+# foo = rmsk[grep("alu", rmsk[,4], ignore.case=TRUE),]
+# table(foo[,4])
+if (!exists("annotations_rmsk")) {
+  # annots = c("mm10_lncrna_gencode")
+  # annots = c('mm10_cpgs', 'mm10_basicgenes', "mm10_lncrna_gencode", "mm10_enhancers_fantom")
+  # annots = c('mm10_cpgs', 'mm10_basicgenes', "mm10_enhancers_fantom")
+  # annots = c( 'mm10_basicgenes', 'mm10_cpgs')
+  # write.table(rmsk[rmsk[,4]=="GSAT_MM",]  , file="gsat.mm10.bed"  , sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  # write.table(rmsk[rmsk[,4]=="SYNREP_MM",], file="synrep.mm10.bed", sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  write.table(rmsk[grep("AATGG|ATGGA|ATTCC|CATTC|GAATG|TCCAT|TGGAA", rmsk[,4]),], file="ggaat.hg19.bed"  , sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  write.table(rmsk[grep("ALR/Alpha", rmsk[,4]),]                                , file="alralpha.hg19.bed", sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  write.table(rmsk[grep("line", rmsk[,4], ignore.case=TRUE),]                   , file="line.hg19.bed", sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  write.table(rmsk[grep("sine", rmsk[,4], ignore.case=TRUE),]                   , file="sine.hg19.bed", sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  write.table(rmsk[grep("alu", rmsk[,4], ignore.case=TRUE),]                    , file="alu.hg19.bed" , sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)
+  annotatr::read_annotations(con="ggaat.hg19.bed"  , genome = "hg19", name = "ggaat"  , format = "bed")
+  annotatr::read_annotations(con="alralpha.hg19.bed", genome = "hg19", name = "alralpha", format = "bed")
+  annotatr::read_annotations(con="line.hg19.bed", genome = "hg19", name = "line", format = "bed")
+  annotatr::read_annotations(con="sine.hg19.bed", genome = "hg19", name = "sine", format = "bed")
+  annotatr::read_annotations(con="alu.hg19.bed" , genome = "hg19", name = "alu", format = "bed")
+  annots = c( "hg19_custom_ggaat", "hg19_custom_alralpha", "hg19_custom_line", "hg19_custom_sine", "hg19_custom_alu")
+  # annots = c( "hg19_basicgenes", "hg19_cpgs", "hg19_custom_gsat", "hg19_custom_synrep")
+  # annots = "hg19_basicgenes"
+  # annots = "hg19_cpgs"
+  annotations_rmsk = annotatr::build_annotations(genome = 'hg19', annotations = annots)  
+}
 
 
+
+head(s$platform[,1:6])
+dim(s$platform)
+foo = s$platform[,1:6]
+foo[,6] = foo[,3]
+foo[,3] = foo[,2]+1
+head(foo)
+tmp_results_filename = "tmp_pf.bed"
+print(tmp_results_filename)
+write.table(foo, file=tmp_results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
+probes_regions = annotatr::read_regions(con=tmp_results_filename, genome=genome, format="bed")
+
+probes_annotated = annotatr::annotate_regions(
+    regions = probes_regions,
+    annotations = annotations_rmsk,
+    ignore.strand = TRUE,
+    quiet = FALSE)
+# A GRanges object is returned
+df_probes_annotated = data.frame(probes_annotated)
+# dedup
+# df_probes_annotated$annot.type = factor(df_probes_annotated$annot.type, levels=paste0(genome, c("_genes_promoters", "_genes_1to5kb", "_genes_5UTRs", "_genes_exons", "_genes_introns", "_genes_3UTRs")))
+table(df_probes_annotated$annot.type)
+df_probes_annotated$name
+```
 
 
 
@@ -325,9 +594,9 @@ head(results)
 
 ```{r annotate dmr, eval=nrow(results)>0}
 # annotatr
-print(results_filename)
-write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
-dm_regions = annotatr::read_regions(con=results_filename, genome=genome, format="bed")
+print(tmp_results_filename)
+write.table(results[,1:6], file=tmp_results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
+dm_regions = annotatr::read_regions(con=tmp_results_filename, genome=genome, format="bed")
 # Build the annotations (a single GRanges object)
 if (!exists("annotations_list")) {
   annotations_list = list()
@@ -403,11 +672,10 @@ tmpidx = order(results[,"z_sidak_p"])
 results = results[tmpidx,]
 
 # results$url = sapply(results[,4], function(i){
-#   output_pdf_filename = paste0("global_results/", prefix2, "_", i, ".pdf")
+#   output_pdf_filename = paste0("global_results/", prefix, "_", i, ".pdf")
 #   paste0("http://epimed.univ-grenoble-alpes.fr/downloads/florent/expedition_5300/results/meth/", output_pdf_filename)
 # })
 
-results_filename = paste0("global_results_", prefix2, ".xlsx")
 print(results_filename)
 WriteXLS::WriteXLS(results, results_filename, FreezeCol=6, FreezeRow=1, BoldHeaderRow=TRUE, AdjWidth=TRUE)
 ```
@@ -416,11 +684,34 @@ WriteXLS::WriteXLS(results, results_filename, FreezeCol=6, FreezeRow=1, BoldHead
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Results
+
 `r study_filename`
 
 $$\text{`r model_formula`}$$
 
-There are `r nrow(results)` regions of interest with `pval_thresh`=$`r pval_thresh`$.
+There are `r nrow(results)` regions of interest with `newas`=$`r newas`$ and `neighb`=$`r neighb`$.
 
 [`r results_filename`](./`r results_filename`)
 
@@ -432,7 +723,19 @@ print(tmp_results[1:min(nb_max_res, nrow(tmp_results)),])
 ```
 
 
-```{r, eval=nrow(results)>0}
+```{r, eval=nrow(results)>0, eval=FALSE}
+# combp_res_probes = read.table(gzfile(paste0("dmr_study_r0_ewas2000_nn1000_GSE42861.rds_modelcalllm_meth~age+gender_1e-30.fdr.bed.gz")), comment="@", header=TRUE)
+# head(combp_res_probes)
+combp_res_probes = bed
+combp_res_probes[,4]= combp_res_probes[,5]
+combp_res_probes[,6]= combp_res_probes[,5]
+head(combp_res_probes)
+
+df_ewas = data.frame(ewas)
+head(df_ewas)
+df_ewas[,4] = rownames(df_ewas)
+head(df_ewas)
+
 if (nrow(results) > 0) {
   for (i in rownames(results)[1:min(nb_max_res, nrow(results))]) {
     print(i)
@@ -445,7 +748,7 @@ if (nrow(results) > 0) {
     plot_res(
       roi, 
       combp_res_probes=combp_res_probes, 
-      ewas=ewas, 
+      ewas=df_ewas, 
       pheno_key=rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2],
       idx_probes=idx_probes,
       study_filename=study_filename
@@ -453,31 +756,6 @@ if (nrow(results) > 0) {
   } 
 }
 ```
-
-```{r results_pdf, eval=FALSE}
-dir.create(path="global_results", showWarnings=FALSE, recursive=TRUE)
-if (nrow(results) > 0) {
-  for (i in rownames(results)) {
-    output_pdf_filename = paste0("global_results/", prefix2, "_", i, ".pdf")
-    print(paste0("http://epimed.univ-grenoble-alpes.fr/downloads/florent/expedition_5300/results/meth/", output_pdf_filename))
-    pdf(output_pdf_filename, width=12, height=6)
-    print(i)
-    roi = results[i,]
-    if (nrow(results)>1 & !is.matrix(dmr_indexed_probes)) {
-      idx_probes = dmr_indexed_probes[[i]]
-    } else {
-      idx_probes = dmr_indexed_probes[,i]
-    }
-    plot_res(roi, combp_res_probes=combp_res_probes, ewas=ewas,
-      pheno_key=rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[2],
-      idx_probes=idx_probes,
-      study_filename=study_filename
-    )
-    dev.off()
-  } 
-}
-```
-
 
 
 

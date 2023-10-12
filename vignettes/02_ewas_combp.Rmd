@@ -247,7 +247,7 @@ if (file.exists(combp_res_region_filename)) {
   combp_res_region
 }
 results = combp_res_region
-results_filename = paste0("tmp_", prefix2, ".bed")
+tmp_results_filename = paste0("tmp_", prefix2, ".bed")
 ```
 
 
@@ -325,9 +325,9 @@ head(results)
 
 ```{r annotate dmr, eval=nrow(results)>0}
 # annotatr
-print(results_filename)
-write.table(results[,1:6], file=results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
-dm_regions = annotatr::read_regions(con=results_filename, genome=genome, format="bed")
+print(tmp_results_filename)
+write.table(results[,1:6], file=tmp_results_filename, sep="\t", quote=FALSE,row.names=FALSE, col.names=FALSE)      
+dm_regions = annotatr::read_regions(con=tmp_results_filename, genome=genome, format="bed")
 # Build the annotations (a single GRanges object)
 if (!exists("annotations_list")) {
   annotations_list = list()

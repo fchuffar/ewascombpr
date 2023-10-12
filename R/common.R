@@ -1,3 +1,5 @@
+if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS, cache=cachem::cache_mem(max_size = 10*1024 * 1024^2)) }
+
 dmprocr_get_probe_names = function (gene, pf_meth, pf_chr_colname = "Chromosome", pf_pos_colname = "Start", 
     up_str = 5000, dwn_str = 5000) 
 {
@@ -41,7 +43,6 @@ dmprocr_get_probe_names = function (gene, pf_meth, pf_chr_colname = "Chromosome"
     }
 }
 
-if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
   
   
 #ewas_orig = ewas = mewas_func2(d=d, e=e, USE_PARAPPLY=USE_PARAPPLY, model_formula=model_formula, model_func_name=model_func_name, nb_fact_of_interest=nb_fact_of_interest)

@@ -1,4 +1,4 @@
-cd ~/projects/breast/results/04.2_ewascombpr/vignettes
+cd ~/projects/ewascombpr/vignettes
 source config
 echo ${study}
 echo ${project}
@@ -26,4 +26,14 @@ Sys.setenv(PYTHONPATH = "/summer/epistorage/opt/combined-pvalues/")
 
 export PYTHONPATH="/summer/epistorage/opt/combined-pvalues/"
 pip install toolshed interlap
+
+
+
+
+s = readRDS("study_r0_ewas2000_nn1000_GSE42861.rds")
+idx = readRDS("df_r0_ewas2000_nn1000_GSE42861.rds")
+colnames(idx)
+s$data = s$data[rownames(s$data)%in%colnames(idx),]
+s$platform = s$platform[rownames(s$data),]
+saveRDS(s, "study_r0_ewas2000_nn1000_GSE42861.rds")
 
