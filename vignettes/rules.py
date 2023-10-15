@@ -1,3 +1,18 @@
+rule ewas:
+    input: 
+      # rmd_script="{rmd_script_prefix}.Rmd",
+      study="{prefix}/{study_filename}.rds",
+      rmd_script="{prefix}/01_ewas.Rmd",      
+    output: 
+      html = "{prefix}/01_ewas_{study_filename}.rds_{modelcall}_meth~{model_formula}.html"      ,           
+    threads: 32
+    shell:"""
+export PATH="/summer/epistorage/opt/bin:$PATH"
+export PATH="/summer/epistorage/miniconda3/bin:$PATH"
+cd {wildcards.prefix}
+echo "study_filename='{wildcards.study_filename}.rds'; model_func_name = '{wildcards.modelcall}' ; model_formula='meth~{wildcards.model_formula}' ; rmarkdown::render('{input.rmd_script}', output_file=paste0('01_ewas_', study_filename, '_', model_func_name, '_', model_formula, '.html'))" | Rscript -
+"""
+
 rule ewas_combp:
     input: 
       # rmd_script="{rmd_script_prefix}.Rmd",
