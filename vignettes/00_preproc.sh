@@ -8,7 +8,7 @@ rsync -auvP ~/projects/${project}/results/${study}/ cargo:~/projects/${project}/
 snakemake --cores 1 -s wf.py -pn
 
 # launch custom pipeline
-cp preproc.sh 00_preproc.sh
+cp 00_preproc 00_preproc_local.sh
 cp wf.py 00_wf_local.py
 cp rules.py 00_rules_local.py
 

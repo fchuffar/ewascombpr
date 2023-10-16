@@ -37,8 +37,9 @@ if (file.exists(paste0(model_func_name, ".R"))) {
 ```{r outputs}
 bed_ewas_filename = paste0("ewas4combp_", study_filename, "_", model_func_name, "_", model_formula, ".bed")
 gse = substr(study_filename, 7, nchar(study_filename)-4)
-prefix = paste0(gse, "_", model_func_name, "_", model_formula, "_", newas, "_nn", neighb)
+prefix = paste0(gse, "_", model_func_name, "_", model_formula, "_ewas", newas, "_nn", neighb)
 study_output_filename = paste0("study_", prefix, ".rds")
+df_output_filename = paste0("df_", prefix, ".rds")
 ```
 
 ```{r loading data}
@@ -384,6 +385,15 @@ legend("topleft", pch=1, col=2, paste0(length(idx_cpg_newas_neighb), " probes in
 s$data = s$data[rownames(s$data)%in%idx_cpg_newas_neighb,]  
 s$platform = s$platform[rownames(s$data),]
 saveRDS(s, study_output_filename)
+
+
+df = cbind(s$exp_grp, t(s$data[,rownames(s$exp_grp)]))
+print(paste0("Writing ", df_output_filename, "..."))
+saveRDS(df, df_output_filename)
+dim(df)
+
+
+
 ```
 
 
