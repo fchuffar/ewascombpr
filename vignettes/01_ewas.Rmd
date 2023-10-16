@@ -35,6 +35,7 @@ if (file.exists(paste0(model_func_name, ".R"))) {
 ```{r outputs}
 prefix = paste0(study_filename, "_", model_func_name, "_", model_formula)
 bed_ewas_filename = paste0("ewas4combp_", prefix, ".bed")
+rds_ewas_filename = paste0("ewas_", prefix, ".rds")
 ```
 
 ```{r loading data}
@@ -130,6 +131,11 @@ if (nrow(d)==nrow(ewas)) {
   stop(paste0("ewas do not have the same dimension as d."))
 }
 
+print("***********Before")
+saveRDS(ewas, rds_ewas_filename)
+print("***********After")
+
+
 dim(ewas)
 ewas = ewas[!is.na(ewas[,"lpv"]),]
 dim(ewas)
@@ -198,6 +204,9 @@ if (nrow(d)==nrow(ewas)) {
 } else {
   stop(paste0("ewas do not have the same dimension as d."))
 }
+print("***********Before")
+saveRDS(ewas, rds_ewas_filename)
+print("***********After")
 
 dim(ewas)
 ewas = ewas[!is.na(ewas[,"lpv"]),]

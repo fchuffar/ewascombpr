@@ -5,6 +5,8 @@ rule ewas:
       rmd_script="{prefix}/01_ewas.Rmd",      
     output: 
       html = "{prefix}/01_ewas_{study_filename}.rds_{modelcall}_meth~{model_formula}.html"      ,           
+      bed_ewas = "{prefix}/ewas4combp_{study_filename}.rds_{modelcall}_meth~{model_formula}.bed",           
+      rds_ewas = "{prefix}/ewas_{study_filename}.rds_{modelcall}_meth~{model_formula}.rds"      ,           
     threads: 32
     shell:"""
 export PATH="/summer/epistorage/opt/bin:$PATH"
