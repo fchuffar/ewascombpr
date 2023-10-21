@@ -1,7 +1,7 @@
 project="breast"
-study="04.2_ewascombpr"
+study="dnamaging"
 species="Homo_sapiens"  
 genome="hg19"
 annotation="UCSC"
-FILTER_EWAS_FOR_DMR_CANDIDATE=FALSE
 FILTER_SEXUAL_CHR=TRUE
+FILTER_EWAS_FOR_DMR_CANDIDATE=FALSE

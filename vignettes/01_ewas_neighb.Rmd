@@ -35,6 +35,7 @@ if (file.exists(paste0(model_func_name, ".R"))) {
 ```
 
 ```{r outputs}
+options(scipen=999)
 bed_ewas_filename = paste0("ewas4combp_", study_filename, "_", model_func_name, "_", model_formula, ".bed")
 gse = substr(study_filename, 7, nchar(study_filename)-4)
 prefix = paste0(gse, "_", model_func_name, "_", model_formula, "_ewas", newas, "_nn", neighb)

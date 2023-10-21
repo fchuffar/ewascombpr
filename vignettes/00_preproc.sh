@@ -1,16 +1,18 @@
 cd ~/projects/ewascombpr/vignettes
+rsync -auvP ~/projects/ewascombpr/ cargo:~/projects/ewascombpr/
 source config
 echo ${study}
 echo ${project}
-rsync -auvP ~/projects/${project}/results/${study}/ cargo:~/projects/${project}/results/${study}/
+rsync -auvP ~/projects/${project}/results/${study}/ cargo:~/projects/${project}/results/${study}/ --dry-run
 
 # launch default pipeline
 snakemake --cores 1 -s wf.py -pn
 
 # launch custom pipeline
-cp 00_preproc 00_preproc_local.sh
+cp 00_preproc.sh 00_preproc_local.sh
 cp wf.py 00_wf_local.py
 cp rules.py 00_rules_local.py
+cp config config_local
 
 snakemake --cores 1 -s 00_wf_local.py -pn
 

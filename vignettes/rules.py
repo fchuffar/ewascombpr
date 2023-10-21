@@ -1,3 +1,20 @@
+# rule ewas_neighb:
+#     input:
+#       bed_ewas = "{prefix}/ewas4combp_{study_filename}.rds_{modelcall}_meth~{model_formula}.bed",
+#       rmd_script="{prefix}/01_ewas_neighb.Rmd",
+#     output:
+#       study_rds = "{prefix}/{study_filename}_{model_func_name}_{model_formula}_ewas{newas}_nn{neighb}.rds",
+#       html =      "{prefix}/01_ewas_neighb_{study_filename}_{model_func_name}_{model_formula}_ewas{newas}_nn{neighb}.html"      ,
+#     threads: 31
+#     shell:"""
+# export PATH="/summer/epistorage/opt/bin:$PATH"
+# export PATH="/summer/epistorage/miniconda3/bin:$PATH"
+# cd {wildcards.prefix}
+# echo "study_filename='{wildcards.study_filename}.rds' ; model_func_name='{wildcards.model_func_name}' ; model_formula='{wildcards.model_formula}' ; newas={wildcards.newas}; neighb={wildcards.neighb}; rmarkdown::render('{input.rmd_script}', output_file='{output.html}')" | Rscript -
+# """
+
+
+
 rule ewas:
     input: 
       # rmd_script="{rmd_script_prefix}.Rmd",
