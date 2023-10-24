@@ -1,6 +1,6 @@
 ---
 title: "Methylome analysis"
-subtitle: "ewas + neighb"
+subtitle: "ewas"
 author: "Florent Chuffart, Ekatarina Flin, Fabien Jossaud"
 date: "`r Sys.Date()`"
 output: 
@@ -11,16 +11,14 @@ output:
     number_sections: true
 ---
 
-
-
 ```{r, echo=FALSE, eval=TRUE}
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide", warning=FALSE)
+info = list(start_time = Sys.time())
 source("../R/common.R")
 source("config")
 if (file.exists("00_local_config")) {source("00_local_config")}
 # source("modelcall.R")
 ```
-
 
 ```{r inputs}
 if (!exists("study_filename"))  study_filename = "study_GSE42861.rds"   ;
@@ -108,12 +106,9 @@ for (f in rownames(attr(stats::terms(as.formula(model_formula)), "factor"))[-1])
 }
 ```
 
-
 # Identification of differentially methylated sites using EWAS
 
-
 `r model_formula`
-
 
 ```{r ewas}
 USE_PARAPPLY = TRUE
@@ -185,9 +180,6 @@ fit = limma::eBayes(fit) # compute moderated t-statistics, moderated F-statistic
 head(fit$coefficients)
 range(fit$p.value[,1])
 
-
-
-
 d = cpg_matrix
 e = e[colnames(d),]
 USE_PARAPPLY = TRUE
@@ -214,30 +206,13 @@ dim(ewas)
 head(ewas)
 plot(lpv~beta, ewas, main=model_formula)
 
-
-
-
-
-
-
-
-
-
-
 plot(fit$coefficients[,2], ewas[,"beta"])
-
 plot(-log10(fit$F.p.value),   ewas[,"lpv"], )
 plot(-log10(fit$p.value[,2]), ewas[,"lpv"], )
 
-
-
 plot(lpv~beta, ewas, main=model_formula)
-
 plot(fit$coefficients[,2], -log10(fit$p.value[,2]))
-
 plot(ewas[,"lpv"], -log10(fit$p.value[,2]))
-
-
 ```
 
 
@@ -282,6 +257,18 @@ write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE,
 
 EWAS results is exporetd as: 
 [`r bed_ewas_filename`](./`r bed_ewas_filename`)
+
+
+
+
+
+# Process Information 
+
+```{r}
+info$stop_time = Sys.time()
+info$exec_time = round(difftime(info$stop_time, info$start_time, units="mins"),1)
+saveRDS(info, paste0("info_ewas_", prefix, ".rds"))
+```
 
 
 # Session Information

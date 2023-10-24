@@ -15,6 +15,7 @@ cp rules.py 00_rules_local.py
 cp config config_local
 
 snakemake --cores 1 -s 00_wf_local.py -pn
+snakemake -k -s 00_wf_local.py --jobs 50 --cluster "oarsub --project epimed -l /nodes=1,walltime=10:00:00"  --latency-wait 60 -pn
 
 
 
